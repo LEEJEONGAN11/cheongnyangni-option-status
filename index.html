@@ -26,51 +26,6 @@
     --accent-bg:      #fdf0d6;
     --accent-text:    #7a5200;
   }
-  @media (prefers-color-scheme: dark) {
-    :root:where(:not([data-theme="light"])) .viz-root {
-      color-scheme: dark;
-      --surface-1:      #1a1a19;
-      --page-plane:      #0d0d0d;
-      --text-primary:   #ffffff;
-      --text-secondary: #c3c2b7;
-      --text-muted:     #898781;
-      --gridline:       #2c2c2a;
-      --border:         rgba(255,255,255,0.10);
-      --good:           #0ca30c;
-      --good-bg:        #123512;
-      --good-text:      #3ecf3e;
-      --info:           #3987e5;
-      --info-bg:        #142943;
-      --info-text:      #79aef0;
-      --neutral-bg:     #26261f;
-      --neutral-text:   #a3a196;
-      --accent:         #c98500;
-      --accent-bg:      #3a2c05;
-      --accent-text:    #f0b840;
-    }
-  }
-  :root[data-theme="dark"] .viz-root {
-    color-scheme: dark;
-    --surface-1:      #1a1a19;
-    --page-plane:      #0d0d0d;
-    --text-primary:   #ffffff;
-    --text-secondary: #c3c2b7;
-    --text-muted:     #898781;
-    --gridline:       #2c2c2a;
-    --border:         rgba(255,255,255,0.10);
-    --good:           #0ca30c;
-    --good-bg:        #123512;
-    --good-text:      #3ecf3e;
-    --info:           #3987e5;
-    --info-bg:        #142943;
-    --info-text:      #79aef0;
-    --neutral-bg:     #26261f;
-    --neutral-text:   #a3a196;
-    --accent:         #c98500;
-    --accent-bg:      #3a2c05;
-    --accent-text:    #f0b840;
-  }
-
   * { box-sizing: border-box; }
   html, body { margin:0; padding:0; }
   body {
@@ -83,10 +38,6 @@
   header.top { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:16px;}
   h1 { font-size: 19px; margin: 0 0 4px; }
   .subtitle { color: var(--text-secondary); font-size: 13px; margin: 0; }
-  .theme-toggle {
-    border: 1px solid var(--border); background: var(--surface-1); color: var(--text-secondary);
-    border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer;
-  }
 
   .stat-row { display:grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
   @media (max-width: 640px) {
@@ -152,7 +103,6 @@
     header.top { margin-bottom: 12px; }
     h1 { font-size: 16.5px; }
     .subtitle { font-size: 11.5px; }
-    .theme-toggle { padding: 5px 10px; font-size: 11px; }
     .building { padding: 10px 8px; }
     .building h2 { font-size: 12.5px; }
     .floor-row { grid-template-columns: 34px repeat(5, 1fr); gap:3px; }
@@ -237,8 +187,6 @@
   .plan-placeholder.loading { opacity:.7; }
   .plan-placeholder b { color: var(--text-secondary); }
 
-  .top-actions { display:flex; gap:8px; align-items:center; }
-
   .lightbox-backdrop {
     position: fixed; inset:0; background: rgba(0,0,0,.88); display:none; align-items:center; justify-content:center;
     padding: 24px; z-index: 70;
@@ -259,9 +207,6 @@
     <div>
       <h1>청량리역 요진 와이시티 — 호수별 옵션 계약 현황</h1>
       <p class="subtitle">골구도 기준 · 2026-07-07 데이터 · 정리일 2026-08-19</p>
-    </div>
-    <div class="top-actions">
-      <button class="theme-toggle" id="themeToggle" type="button">다크모드</button>
     </div>
   </header>
 
@@ -601,15 +546,6 @@
       optionHint.textContent = view.activeOption ? ('"' + view.activeOption + '" 선택 세대(' + optionCounts[view.activeOption] + ') 강조 중 · 다시 누르면 해제') : '';
       applyView();
     });
-  });
-
-  // theme toggle
-  const toggle = document.getElementById('themeToggle');
-  toggle.addEventListener('click', () => {
-    const root = document.documentElement;
-    const isDark = root.getAttribute('data-theme') === 'dark';
-    root.setAttribute('data-theme', isDark ? 'light' : 'dark');
-    toggle.textContent = isDark ? '다크모드' : '라이트모드';
   });
 })();
 </script>
