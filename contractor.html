@@ -144,7 +144,8 @@
    설정 — 배포 후 이 값만 본인의 Apps Script 웹 앱 URL로 바꾸세요
    (admin.html과 반드시 같은 주소여야 합니다)
    ========================================================= */
-const API_URL = 'https://script.google.com/macros/s/AKfycby1a33-G9kATzhNLd9r24PLmayG7fiiDC5d_6NEjEtFtxf3Va21tSAv8BMbKWe1SQ_e/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycby1a33-G9kATzhNLd9r24PLmayG7fiiDC5d_6NEjEtFtxf3Va21tSAv8BMbKWe1SQ_e/exec
+';
 
 const STATUS_COLORS = {
   '등록됨': { bg: 'var(--neutral-bg)', text: 'var(--neutral-text)' },
@@ -254,7 +255,7 @@ function renderList() {
       <div class="work-item" onclick="openDetail('${escapeAttr(issue.issue_id)}')">
         <div class="thumb">${thumb ? photoImgHtml(thumb, true) : ''}</div>
         <div class="info">
-          <div class="ho">${escapeHtml(issue.동)} ${escapeHtml(issue.호수)}</div>
+          <div class="ho">${unitLabel(issue)}</div>
           <div class="task">${escapeHtml(issue.카테고리 || '')} · ${escapeHtml(issue.지시사항 || issue.문제설명 || '')}</div>
           <span class="badge" style="background:${c.bg}; color:${c.text};">${escapeHtml(issue.상태)}</span>
         </div>
@@ -269,10 +270,19 @@ function firstPhoto(csv) {
   return String(csv).split(',').filter(Boolean)[0] || '';
 }
 
+/* "101" + "1034" -> "101동 1034호" (이미 동/호가 붙어 있으면 그대로 둡니다) */
+function unitLabel(issue) {
+  const d = String(issue.동 || '').trim();
+  const h = String(issue.호수 || '').trim();
+  const dl = d ? (d.endsWith('동') ? d : d + '동') : '';
+  const hl = h ? (h.endsWith('호') ? h : h + '호') : '';
+  return escapeHtml((dl + ' ' + hl).trim() || '-');
+}
+
 function openDetail(issueId) {
   const issue = myIssues.find(i => i.issue_id === issueId);
   if (!issue) return;
-  document.getElementById('d_title').textContent = issue.동 + ' ' + issue.호수 + ' · ' + issue.issue_id;
+  document.getElementById('d_title').innerHTML = unitLabel(issue) + ' · ' + escapeHtml(issue.issue_id);
   pendingReportPhotos = [];
 
   const reqPhotos = String(issue.요청사진 || '').split(',').filter(Boolean);
@@ -399,6 +409,34 @@ function markPhotoFailed(img) {
 const photoCache = new Map();       // "id|thumb" -> dataUrl
 let drivePhotosBlocked = false;     // 드라이브 직접 링크가 막힌 환경인지 한 번 확인되면 이후엔 바로 API 사용
 
+// 받아온 썸네일은 브라우저에도 저장해둡니다. 다음 방문 때 바로 뜨게 하려고요.
+const PHOTO_LS_KEY = 'as_photo_cache_v1';
+const PHOTO_LS_MAX = 60;
+let photoSaveTimer = null;
+
+function loadPhotoCacheFromStorage() {
+  try {
+    const raw = localStorage.getItem(PHOTO_LS_KEY);
+    if (!raw) return;
+    const obj = JSON.parse(raw);
+    Object.keys(obj).forEach(k => photoCache.set(k, obj[k]));
+  } catch (e) {}
+}
+
+function savePhotoCacheSoon() {
+  clearTimeout(photoSaveTimer);
+  photoSaveTimer = setTimeout(() => {
+    try {
+      // 용량이 작은 목록 썸네일만 저장합니다 (원본은 저장 안 함)
+      const entries = [...photoCache.entries()].filter(([k]) => k.endsWith('|1')).slice(-PHOTO_LS_MAX);
+      localStorage.setItem(PHOTO_LS_KEY, JSON.stringify(Object.fromEntries(entries)));
+    } catch (e) {
+      try { localStorage.removeItem(PHOTO_LS_KEY); } catch (e2) {}
+    }
+  }, 800);
+}
+loadPhotoCacheFromStorage();
+
 function fetchPhotoViaApi(id, thumb) {
   const cacheKey = id + '|' + (thumb ? '1' : '0');
   if (photoCache.has(cacheKey)) return Promise.resolve(photoCache.get(cacheKey));
@@ -406,7 +444,7 @@ function fetchPhotoViaApi(id, thumb) {
   if (thumb) params.thumb = '1';
   return apiGet(params).then(res => {
     const url = (res && res.ok && res.dataUrl) ? res.dataUrl : null;
-    if (url) photoCache.set(cacheKey, url);
+    if (url) { photoCache.set(cacheKey, url); savePhotoCacheSoon(); }
     return url;
   }).catch(() => null);
 }

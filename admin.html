@@ -57,6 +57,9 @@
   .chip.active { background: var(--text-primary); color:#fff; border-color: var(--text-primary); }
   .search-box { flex:1; min-width:160px; }
   .search-box input { width:100%; padding: 8px 12px; border-radius:999px; border:1px solid var(--border); font-size:12.5px; }
+  .filter-label { font-size: 11.5px; color: var(--text-muted); font-weight:700; align-self:center; margin-right:2px; }
+  .chip.company-chip .n { color: var(--text-muted); font-weight:500; margin-left:3px; }
+  .chip.company-chip.active .n { color: rgba(255,255,255,.75); }
 
   /* ---- cards ---- */
   .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
@@ -67,6 +70,10 @@
   .issue-card .ho { font-size:13.5px; font-weight:800; margin-bottom:2px; }
   .issue-card .cat { font-size:11.5px; color: var(--text-muted); margin-bottom:8px; }
   .badge { display:inline-block; font-size:10.5px; font-weight:800; padding:4px 9px; border-radius:999px; }
+  .badge-row { display:flex; gap:5px; flex-wrap:wrap; }
+  .badge.urgent { background: var(--danger); color:#fff; }
+  .badge.late { background: var(--danger-bg); color: var(--danger-text); }
+  .issue-card.overdue { border-color: var(--danger); }
   .empty-state { text-align:center; padding: 60px 20px; color: var(--text-muted); font-size:13.5px; }
 
   /* ---- modal ---- */
@@ -157,7 +164,11 @@
       <span class="chip" data-status="진행중" onclick="setFilter('진행중')">진행중 <span id="cnt-진행중"></span></span>
       <span class="chip" data-status="완료확인대기" onclick="setFilter('완료확인대기')">완료확인대기 <span id="cnt-완료확인대기"></span></span>
       <span class="chip" data-status="완료" onclick="setFilter('완료')">완료 <span id="cnt-완료"></span></span>
-      <div class="search-box"><input id="searchInput" placeholder="동/호수 검색" oninput="renderIssues()"></div>
+      <div class="search-box"><input id="searchInput" placeholder="동/호수·카테고리 검색" oninput="renderIssues()"></div>
+    </div>
+    <div class="filters" id="companyFilterRow">
+      <span class="filter-label">업체별</span>
+      <span class="chip company-chip active" data-company="__all" onclick="setCompanyFilter('__all')">전체</span>
     </div>
     <div id="issueGrid" class="grid"></div>
     <div id="issueEmpty" class="empty-state" style="display:none;">등록된 이슈가 없습니다. 상단의 "새 이슈 등록"으로 시작해보세요.</div>
@@ -180,11 +191,9 @@
       <div class="field"><label>호수</label><input id="c_ho" placeholder="예: 1902호"></div>
     </div>
     <div class="field">
-      <label>카테고리</label>
-      <select id="c_cat">
-        <option>누수</option><option>도장</option><option>타일</option><option>전기</option>
-        <option>도어/창호</option><option>바닥재</option><option>기타</option>
-      </select>
+      <label>카테고리 (골라도 되고, 없으면 직접 입력하세요)</label>
+      <input id="c_cat" list="catList" placeholder="예: 형틀, 철근, 누수…" autocomplete="off">
+      <datalist id="catList"></datalist>
     </div>
     <div class="field"><label>문제 설명</label><textarea id="c_desc" placeholder="상황을 설명해주세요"></textarea></div>
     <div class="field">
@@ -227,7 +236,8 @@
 /* =========================================================
    설정 — 배포 후 이 값만 본인의 Apps Script 웹 앱 URL로 바꾸세요
    ========================================================= */
-const API_URL = 'https://script.google.com/macros/s/AKfycby1a33-G9kATzhNLd9r24PLmayG7fiiDC5d_6NEjEtFtxf3Va21tSAv8BMbKWe1SQ_e/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycby1a33-G9kATzhNLd9r24PLmayG7fiiDC5d_6NEjEtFtxf3Va21tSAv8BMbKWe1SQ_e/exec
+';
 
 const STATUS_COLORS = {
   '등록됨': { bg: 'var(--neutral-bg)', text: 'var(--neutral-text)' },
@@ -239,8 +249,10 @@ const STATUS_COLORS = {
 let adminPin = '';
 let allIssues = [];
 let currentFilter = '__all';
+let companyFilter = '__all';
 let pendingPhotos = { createPreview: [] };
 let companies = [];
+let categories = [];
 
 function toast(msg) {
   const t = document.getElementById('toast');
@@ -277,7 +289,11 @@ function doLogin() {
     localStorage.setItem('as_admin_pin', pin);
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('mainScreen').style.display = 'block';
-    loadAll();
+    // 로그인 확인에서 이미 목록을 받아왔으니 그대로 씁니다 (같은 요청을 두 번 보내지 않음)
+    allIssues = res.issues || [];
+    document.getElementById('issueLoading').style.display = 'none';
+    renderIssues();
+    loadSideData();
   }).catch(() => {
     document.getElementById('loginError').textContent = 'API 연결에 실패했습니다. API_URL 설정을 확인해주세요.';
   });
@@ -305,25 +321,66 @@ function switchTab(name) {
 }
 
 /* ---------- load data ---------- */
+// 업체 목록 · 카테고리 목록은 자주 안 바뀌므로 이슈 목록과 따로, 한 번만 받아옵니다.
+let sideDataLoaded = false;
+function loadSideData(force) {
+  if (sideDataLoaded && !force) return Promise.resolve();
+  return Promise.all([
+    apiGet({ action: 'listCompanies', adminPin }),
+    apiGet({ action: 'listCategories' })
+  ]).then(([companyRes, catRes]) => {
+    if (companyRes && companyRes.ok) {
+      companies = companyRes.companies || [];
+      const sel = document.getElementById('c_company');
+      sel.innerHTML = '<option value="">— 나중에 배정 —</option>' +
+        companies.map(c => `<option value="${escapeAttr(c.name)}" data-contact="${escapeAttr(c.contact||'')}">${escapeHtml(c.name)}${c.trade ? ' (' + escapeHtml(c.trade) + ')' : ''}</option>`).join('');
+      renderCompanyFilter();
+    }
+    if (catRes && catRes.ok) {
+      categories = catRes.categories || [];
+      document.getElementById('catList').innerHTML =
+        categories.map(c => `<option value="${escapeAttr(c.name)}">${c.group ? escapeHtml(c.group) : ''}</option>`).join('');
+    }
+    sideDataLoaded = true;
+  }).catch(() => {});
+}
+
 function loadAll() {
   document.getElementById('issueLoading').style.display = 'block';
-  Promise.all([
-    apiGet({ action: 'listIssues', adminPin }),
-    apiGet({ action: 'listCompanies', adminPin })
-  ]).then(([issueRes, companyRes]) => {
+  return apiGet({ action: 'listIssues', adminPin }).then(issueRes => {
     document.getElementById('issueLoading').style.display = 'none';
     if (issueRes.ok) { allIssues = issueRes.issues; renderIssues(); }
     else toast(issueRes.error || '불러오기 실패');
-    if (companyRes.ok) {
-      companies = companyRes.companies;
-      const sel = document.getElementById('c_company');
-      sel.innerHTML = '<option value="">— 나중에 배정 —</option>' +
-        companies.map(c => `<option value="${escapeHtml(c.name)}" data-contact="${escapeHtml(c.contact||'')}">${escapeHtml(c.name)}</option>`).join('');
-    }
+    return loadSideData();
   }).catch(() => {
     document.getElementById('issueLoading').style.display = 'none';
     toast('API 연결에 실패했습니다.');
   });
+}
+
+function renderCompanyFilter() {
+  const row = document.getElementById('companyFilterRow');
+  const counts = {};
+  allIssues.forEach(i => {
+    const n = i.담당업체 || '__none';
+    counts[n] = (counts[n] || 0) + 1;
+  });
+  const names = companies.map(c => c.name).filter(n => counts[n]);
+  let html = '<span class="filter-label">업체별</span>' +
+    `<span class="chip company-chip${companyFilter === '__all' ? ' active' : ''}" data-company="__all" onclick="setCompanyFilter('__all')">전체 <span class="n">${allIssues.length}</span></span>`;
+  names.forEach(n => {
+    html += `<span class="chip company-chip${companyFilter === n ? ' active' : ''}" data-company="${escapeAttr(n)}" onclick="setCompanyFilter('${escapeAttr(n)}')">${escapeHtml(n)} <span class="n">${counts[n]}</span></span>`;
+  });
+  if (counts['__none']) {
+    html += `<span class="chip company-chip${companyFilter === '__none' ? ' active' : ''}" data-company="__none" onclick="setCompanyFilter('__none')">미배정 <span class="n">${counts['__none']}</span></span>`;
+  }
+  row.innerHTML = html;
+}
+
+function setCompanyFilter(name) {
+  companyFilter = name;
+  renderCompanyFilter();
+  renderIssues();
 }
 
 function loadStats() {
@@ -367,23 +424,54 @@ function renderIssues() {
   const query = (document.getElementById('searchInput').value || '').trim();
   let list = allIssues;
   if (currentFilter !== '__all') list = list.filter(i => i.상태 === currentFilter);
-  if (query) list = list.filter(i => (i.동 + i.호수).includes(query));
+  if (companyFilter === '__none') list = list.filter(i => !i.담당업체);
+  else if (companyFilter !== '__all') list = list.filter(i => i.담당업체 === companyFilter);
+  if (query) list = list.filter(i =>
+    (String(i.동) + String(i.호수)).includes(query) ||
+    String(i.카테고리 || '').includes(query) ||
+    String(i.문제설명 || '').includes(query));
 
   const grid = document.getElementById('issueGrid');
   document.getElementById('issueEmpty').style.display = list.length ? 'none' : 'block';
   grid.innerHTML = list.map(issue => {
     const c = STATUS_COLORS[issue.상태] || STATUS_COLORS['등록됨'];
     const thumbUrl = firstPhoto(issue.요청사진);
+    const late = overdueDays(issue);
     return `
-      <div class="issue-card" onclick="openDetail('${escapeAttr(issue.issue_id)}')">
+      <div class="issue-card${late > 0 ? ' overdue' : ''}" onclick="openDetail('${escapeAttr(issue.issue_id)}')">
         <div class="thumb">${thumbUrl ? photoImgHtml(thumbUrl, true) : '사진 없음'}</div>
-        <div class="ho">${escapeHtml(issue.동)} ${escapeHtml(issue.호수)}</div>
+        <div class="ho">${unitLabel(issue)}</div>
         <div class="cat">${escapeHtml(issue.카테고리 || '기타')} · ${escapeHtml(issue.담당업체 || '미배정')}</div>
-        <span class="badge" style="background:${c.bg}; color:${c.text};">${escapeHtml(issue.상태)}</span>
+        <div class="badge-row">
+          <span class="badge" style="background:${c.bg}; color:${c.text};">${escapeHtml(issue.상태)}</span>
+          ${issue.우선순위 === '긴급' ? '<span class="badge urgent">긴급</span>' : ''}
+          ${late > 0 ? `<span class="badge late">${late}일 지연</span>` : ''}
+        </div>
       </div>
     `;
   }).join('');
   wirePhotoFallbacks(grid);
+}
+
+/* "101" + "1034" -> "101동 1034호" (이미 동/호가 붙어 있으면 그대로 둡니다) */
+function unitLabel(issue) {
+  const d = String(issue.동 || '').trim();
+  const h = String(issue.호수 || '').trim();
+  const dl = d ? (d.endsWith('동') ? d : d + '동') : '';
+  const hl = h ? (h.endsWith('호') ? h : h + '호') : '';
+  return escapeHtml((dl + ' ' + hl).trim() || '-');
+}
+
+/* 희망완료일이 지났고 아직 안 끝난 건이면 지연 일수를 돌려줍니다. */
+function overdueDays(issue) {
+  if (!issue.희망완료일) return 0;
+  if (issue.상태 === '완료') return 0;
+  const due = new Date(issue.희망완료일);
+  if (isNaN(due.getTime())) return 0;
+  const today = new Date();
+  due.setHours(23, 59, 59, 999);
+  const diff = Math.floor((today - due) / 86400000);
+  return diff > 0 ? diff : 0;
 }
 
 function firstPhoto(csv) {
@@ -396,6 +484,7 @@ function firstPhoto(csv) {
 function openCreateModal() {
   document.getElementById('c_dong').value = '';
   document.getElementById('c_ho').value = '';
+  document.getElementById('c_cat').value = '';
   document.getElementById('c_desc').value = '';
   document.getElementById('c_instruction').value = '';
   document.getElementById('c_due').value = '';
@@ -462,7 +551,7 @@ function submitCreate() {
     adminPin,
     동: dong,
     호수: ho,
-    카테고리: document.getElementById('c_cat').value,
+    카테고리: document.getElementById('c_cat').value.trim(),
     문제설명: document.getElementById('c_desc').value.trim(),
     우선순위: document.getElementById('c_priority').value,
     희망완료일: document.getElementById('c_due').value,
@@ -487,7 +576,10 @@ let detailPhotos = { reject: [] };
 function openDetail(issueId) {
   const issue = allIssues.find(i => i.issue_id === issueId);
   if (!issue) return;
-  document.getElementById('d_title').textContent = issue.동 + ' ' + issue.호수 + ' · ' + issue.issue_id;
+  const late = overdueDays(issue);
+  document.getElementById('d_title').innerHTML =
+    unitLabel(issue) + ' · ' + escapeHtml(issue.issue_id) +
+    (late > 0 ? ` <span class="badge late">${late}일 지연</span>` : '');
 
   const reqPhotos = String(issue.요청사진 || '').split(',').filter(Boolean);
   const donePhotos = String(issue.완료사진 || '').split(',').filter(Boolean);
@@ -631,6 +723,34 @@ function markPhotoFailed(img) {
 const photoCache = new Map();       // "id|thumb" -> dataUrl
 let drivePhotosBlocked = false;     // 드라이브 직접 링크가 막힌 환경인지 한 번 확인되면 이후엔 바로 API 사용
 
+// 받아온 썸네일은 브라우저에도 저장해둡니다. 다음 방문 때 바로 뜨게 하려고요.
+const PHOTO_LS_KEY = 'as_photo_cache_v1';
+const PHOTO_LS_MAX = 60;
+let photoSaveTimer = null;
+
+function loadPhotoCacheFromStorage() {
+  try {
+    const raw = localStorage.getItem(PHOTO_LS_KEY);
+    if (!raw) return;
+    const obj = JSON.parse(raw);
+    Object.keys(obj).forEach(k => photoCache.set(k, obj[k]));
+  } catch (e) {}
+}
+
+function savePhotoCacheSoon() {
+  clearTimeout(photoSaveTimer);
+  photoSaveTimer = setTimeout(() => {
+    try {
+      // 용량이 작은 목록 썸네일만 저장합니다 (원본은 저장 안 함)
+      const entries = [...photoCache.entries()].filter(([k]) => k.endsWith('|1')).slice(-PHOTO_LS_MAX);
+      localStorage.setItem(PHOTO_LS_KEY, JSON.stringify(Object.fromEntries(entries)));
+    } catch (e) {
+      try { localStorage.removeItem(PHOTO_LS_KEY); } catch (e2) {}
+    }
+  }, 800);
+}
+loadPhotoCacheFromStorage();
+
 function fetchPhotoViaApi(id, thumb) {
   const cacheKey = id + '|' + (thumb ? '1' : '0');
   if (photoCache.has(cacheKey)) return Promise.resolve(photoCache.get(cacheKey));
@@ -638,7 +758,7 @@ function fetchPhotoViaApi(id, thumb) {
   if (thumb) params.thumb = '1';
   return apiGet(params).then(res => {
     const url = (res && res.ok && res.dataUrl) ? res.dataUrl : null;
-    if (url) photoCache.set(cacheKey, url);
+    if (url) { photoCache.set(cacheKey, url); savePhotoCacheSoon(); }
     return url;
   }).catch(() => null);
 }
