@@ -74,6 +74,28 @@
   .badge.urgent { background: var(--danger); color:#fff; }
   .badge.late { background: var(--danger-bg); color: var(--danger-text); }
   .issue-card.overdue { border-color: var(--danger); }
+  .issue-card.cancelled { opacity:.62; }
+  .issue-card.cancelled .thumb { filter:grayscale(1); }
+  .chip.cancel-chip { color: var(--text-muted); }
+  /* 수정·취소·삭제 창은 상세창(z-index 100) 위에 떠야 합니다 */
+  #editOverlay, #cancelOverlay, #delOverlay { z-index: 120; }
+  .detail-actions { display:flex; gap:7px; margin-bottom:12px; flex-wrap:wrap; }
+  .detail-actions .mini { padding:6px 13px; border-radius:999px; border:1px solid var(--border);
+    background:var(--surface-1); font-size:12px; font-weight:700; cursor:pointer; font-family:inherit;
+    color:var(--text-primary); }
+  .detail-actions .mini.warn { color:var(--accent-text); border-color:var(--accent); }
+  .detail-actions .mini.danger { color:var(--danger-text); border-color:var(--danger); }
+  .cancel-note { background:var(--neutral-bg); border-radius:9px; padding:11px 13px; font-size:12.5px;
+    color:var(--text-secondary); line-height:1.7; margin-bottom:12px; }
+  .edit-note { background:var(--accent-bg); color:var(--accent-text); border-radius:9px;
+    padding:10px 12px; font-size:12px; line-height:1.7; margin-bottom:12px; display:none; }
+  .history { margin-top:12px; font-size:12px; color:var(--text-muted); }
+  .history summary { cursor:pointer; font-weight:700; }
+  .history pre { white-space:pre-wrap; font-family:inherit; background:var(--neutral-bg);
+    border-radius:8px; padding:9px 11px; margin:7px 0 0; line-height:1.7; }
+  /* 띄어쓰기 없는 긴 글이 카드 밖으로 삐져나가지 않게 */
+  .issue-card .ho, .issue-card .cat { overflow-wrap:anywhere; word-break:break-word; }
+  .detail-row, .modal h2 { overflow-wrap:anywhere; word-break:break-word; }
   .empty-state { text-align:center; padding: 60px 20px; color: var(--text-muted); font-size:13.5px; }
 
   /* ---- modal ---- */
@@ -131,6 +153,26 @@
   .plan-tools .vbtn[aria-pressed="true"] { background:var(--text-primary); color:#fff; border-color:var(--text-primary); }
   .plan-tools .vbtn.ghost { color:var(--danger-text); }
   .plan-hint { font-size:11.5px; color:var(--text-muted); margin-top:6px; line-height:1.65; }
+
+  .plan-rgn { position:absolute; border:2.5px solid var(--danger); background:rgba(214,66,42,.16);
+              border-radius:3px; pointer-events:none; }
+  .plan-rgn.preview { border-style:dashed; }
+  .plan-rgn .r-num { position:absolute; top:-10px; left:-10px; width:19px; height:19px; border-radius:50%;
+                     background:var(--danger); color:#fff; font-size:10.5px; font-weight:800;
+                     display:flex; align-items:center; justify-content:center; border:2px solid #fff; }
+  .plan-box.pickable { cursor:crosshair; touch-action:none; user-select:none; }
+  .plan-zoom-btn { position:absolute; right:8px; bottom:8px; padding:6px 11px; border-radius:999px;
+                   border:1px solid rgba(0,0,0,.15); background:rgba(255,255,255,.94);
+                   font-size:11.5px; font-weight:700; cursor:pointer; font-family:inherit; z-index:2; }
+  .plan-zoom { position:fixed; inset:0; background:rgba(0,0,0,.9); display:none;
+               align-items:center; justify-content:center; z-index:300; padding:16px; }
+  .plan-zoom.open { display:flex; }
+  .plan-zoom-inner { max-width:100%; max-height:100%; overflow:auto; -webkit-overflow-scrolling:touch; }
+  .plan-zoom-stage { position:relative; display:inline-block; }
+  .plan-zoom-stage img { display:block; max-width:none; width:min(1400px, 92vw); background:#fff; border-radius:4px; }
+  .plan-zoom-close { position:fixed; top:16px; right:18px; width:38px; height:38px; border-radius:999px;
+                     background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.35);
+                     color:#fff; font-size:17px; cursor:pointer; z-index:301; }
   .plan-badge { font-size:11px; font-weight:800; color:var(--brand-text);
                 background:var(--brand-bg); padding:3px 8px; border-radius:999px; margin-left:6px; }
   .detail-row { font-size: 12.5px; margin-bottom: 8px; }
@@ -142,6 +184,30 @@
   .stat-card h3 { font-size: 14px; margin:0 0 12px; }
   .stat-line { display:flex; justify-content:space-between; font-size:12.5px; color: var(--text-secondary); padding: 4px 0; }
   .stat-line b { color: var(--text-primary); }
+
+  /* ---- 업체별 막대 ---- */
+  .figure { background:var(--surface-2); border:1px solid var(--border); border-radius:12px;
+            padding:18px 20px; margin-bottom:14px; }
+  .figure h3 { font-size:14px; margin:0 0 3px; }
+  .figure .sub { font-size:11.5px; color:var(--text-muted); margin:0 0 14px; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px; font-size:11.5px; color:var(--text-secondary); }
+  .legend span { display:inline-flex; align-items:center; gap:5px; }
+  .legend i { width:11px; height:11px; border-radius:2px; display:inline-block; }
+  .bar-row { display:grid; grid-template-columns:96px 1fr 62px; gap:10px; align-items:center; margin-bottom:9px; }
+  @media (max-width:560px){ .bar-row { grid-template-columns:74px 1fr 52px; gap:7px; } }
+  .bar-name { font-size:12px; font-weight:700; overflow-wrap:anywhere; }
+  .bar-track { height:22px; border-radius:4px; overflow:hidden; display:flex; background:var(--neutral-bg); }
+  .bar-seg { height:100%; display:flex; align-items:center; justify-content:center;
+             font-size:10.5px; font-weight:800; color:#fff; min-width:0; }
+  .bar-seg + .bar-seg { margin-left:2px; }          /* 표면색 2px 간격 */
+  .bar-seg.ghost { background:var(--neutral-bg); color:var(--neutral-text); }
+  .bar-val { font-size:12px; color:var(--text-secondary); font-variant-numeric:tabular-nums; text-align:right; }
+  .fig-empty { font-size:12.5px; color:var(--text-muted); padding:18px 0; text-align:center; }
+  table.statt { width:100%; border-collapse:collapse; font-size:12.5px; }
+  table.statt th, table.statt td { padding:8px 9px; border-bottom:1px solid var(--gridline); text-align:right; }
+  table.statt th:first-child, table.statt td:first-child { text-align:left; }
+  table.statt th { font-size:11px; color:var(--text-muted); font-weight:700; }
+  table.statt tr:last-child td { border-bottom:none; }
 
   .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background: var(--text-primary); color:#fff; padding:11px 20px; border-radius:999px; font-size:13px; z-index:200; display:none; }
   .loading-note { font-size:12.5px; color: var(--text-muted); text-align:center; padding: 30px; }
@@ -184,6 +250,7 @@
       <span class="chip" data-status="진행중" onclick="setFilter('진행중')">진행중 <span id="cnt-진행중"></span></span>
       <span class="chip" data-status="완료확인대기" onclick="setFilter('완료확인대기')">완료확인대기 <span id="cnt-완료확인대기"></span></span>
       <span class="chip" data-status="완료" onclick="setFilter('완료')">완료 <span id="cnt-완료"></span></span>
+      <span class="chip cancel-chip" data-status="취소됨" onclick="setFilter('취소됨')">🗑 취소함 <span id="cnt-취소됨"></span></span>
       <div class="search-box"><input id="searchInput" placeholder="동/호수·카테고리 검색" oninput="renderIssues()"></div>
     </div>
     <div class="filters" id="companyFilterRow">
@@ -196,8 +263,14 @@
   </div>
 
   <div class="tab-pane" id="tab-stats">
-    <div id="statsGrid" class="stats-grid"></div>
-    <div id="statsLoading" class="loading-note">불러오는 중...</div>
+    <div class="filters" id="periodRow">
+      <span class="filter-label">기간</span>
+      <span class="chip period-chip active" data-period="all" onclick="setPeriod('all')">전체</span>
+      <span class="chip period-chip" data-period="month" onclick="setPeriod('month')">이번 달</span>
+      <span class="chip period-chip" data-period="30" onclick="setPeriod('30')">최근 30일</span>
+      <span class="chip period-chip" data-period="90" onclick="setPeriod('90')">최근 90일</span>
+    </div>
+    <div id="statsBody"></div>
   </div>
 </div>
 
@@ -248,7 +321,69 @@
     <div class="field"><label>작업 지시사항</label><textarea id="c_instruction" placeholder="업체에게 전달할 구체적인 작업 내용"></textarea></div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('createOverlay')">취소</button>
-      <button class="btn-primary" onclick="submitCreate()">등록하기</button>
+      <button class="btn-primary" id="c_submit" onclick="submitCreate()">등록하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 이슈 수정 모달 -->
+<div class="overlay" id="editOverlay">
+  <div class="modal">
+    <button class="close-x" onclick="closeModal('editOverlay')">✕</button>
+    <h2 id="e_title">이슈 수정</h2>
+    <div class="edit-note" id="e_note"></div>
+    <div class="field-row">
+      <div class="field"><label>동</label><input id="e_dong" list="dongList" autocomplete="off"></div>
+      <div class="field"><label>호수 <span id="e_typeBadge"></span></label><input id="e_ho" list="hoList" autocomplete="off"></div>
+    </div>
+    <div class="field" id="e_planField">
+      <label>도면에서 위치 표시</label>
+      <div id="e_planHost"></div>
+    </div>
+    <div class="field"><label>카테고리</label><input id="e_cat" list="catList" autocomplete="off"></div>
+    <div class="field"><label>문제 설명</label><textarea id="e_desc"></textarea></div>
+    <div class="field-row">
+      <div class="field"><label>우선순위</label>
+        <select id="e_priority"><option>긴급</option><option>보통</option><option>낮음</option></select>
+      </div>
+      <div class="field"><label>희망완료일</label><input id="e_due" type="date"></div>
+    </div>
+    <div class="field"><label>담당 업체</label><select id="e_company"></select></div>
+    <div class="field"><label>작업 지시사항</label><textarea id="e_instruction"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('editOverlay')">닫기</button>
+      <button class="btn-primary" id="e_submit" onclick="submitEdit()">저장하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 취소 확인 모달 -->
+<div class="overlay" id="cancelOverlay">
+  <div class="modal" style="max-width:400px;">
+    <button class="close-x" onclick="closeModal('cancelOverlay')">✕</button>
+    <h2 id="x_title">이슈 취소</h2>
+    <p style="font-size:13px; color:var(--text-secondary); line-height:1.75; margin:0 0 12px;">
+      지우지 않고 <b>취소됨</b>으로 남깁니다. 업체 화면에도 취소로 표시되고, 나중에 취소함에서 다시 볼 수 있습니다.
+    </p>
+    <div class="field"><label>취소 사유 (필수)</label><textarea id="x_reason" placeholder="예: 입주자 요청으로 철회"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('cancelOverlay')">그만두기</button>
+      <button class="btn-reject" id="x_submit" onclick="submitCancel()">취소 처리</button>
+    </div>
+  </div>
+</div>
+
+<!-- 삭제 확인 모달 -->
+<div class="overlay" id="delOverlay">
+  <div class="modal" style="max-width:400px;">
+    <button class="close-x" onclick="closeModal('delOverlay')">✕</button>
+    <h2>완전 삭제</h2>
+    <p style="font-size:13px; color:var(--danger-text); line-height:1.75; margin:0 0 14px;">
+      <b id="d_delTarget"></b> 을(를) 시트에서 <b>영구히 지웁니다.</b> 되돌릴 수 없습니다.
+    </p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('delOverlay')">그만두기</button>
+      <button class="btn-reject" id="del_submit" onclick="submitDelete()">영구 삭제</button>
     </div>
   </div>
 </div>
@@ -268,13 +403,14 @@
 /* =========================================================
    설정 — 배포 후 이 값만 본인의 Apps Script 웹 앱 URL로 바꾸세요
    ========================================================= */
-const API_URL = 'https://script.google.com/macros/s/AKfycbw7Mk6uFVOx_mgRSVO-wfLqy2zFqxQ9c-lNHBBlYA4aCgqQ9AR0YaaZmhaiYTE2d0r7/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwrkU7A1rof1j2TrUXrpscs7WsBq-1qZJyV0CLP9T6k_TP-gu-IUo1PPW9EC3sef4B8/exec';
 
 const STATUS_COLORS = {
   '등록됨': { bg: 'var(--neutral-bg)', text: 'var(--neutral-text)' },
   '진행중': { bg: 'var(--info-bg)', text: 'var(--info-text)' },
   '완료확인대기': { bg: 'var(--accent-bg)', text: 'var(--accent-text)' },
   '완료': { bg: 'var(--good-bg)', text: 'var(--good-text)' },
+  '취소됨': { bg: 'var(--neutral-bg)', text: 'var(--neutral-text)' },
 };
 
 let adminPin = '';
@@ -337,8 +473,10 @@ function doLogin() {
     // 로그인 확인에서 이미 목록을 받아왔으니 그대로 씁니다 (같은 요청을 두 번 보내지 않음)
     allIssues = res.issues || [];
     document.getElementById('issueLoading').style.display = 'none';
+    restoreViewState();
     renderIssues();
     loadSideData();
+    resetIdleTimer();
   }).catch(() => {
     failLogin('접속에 실패했습니다. 상단 API_URL 설정과 인터넷 연결을 확인해주세요.');
   });
@@ -346,6 +484,7 @@ function doLogin() {
 
 function logout() {
   localStorage.removeItem('as_admin_pin');
+  localStorage.removeItem('as_admin_view');
   location.reload();
 }
 
@@ -363,7 +502,7 @@ function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
-  if (name === 'stats') loadStats();
+  if (name === 'stats') renderStats();
 }
 
 /* ---------- load data ---------- */
@@ -429,27 +568,168 @@ function setCompanyFilter(name) {
   renderIssues();
 }
 
-function loadStats() {
-  document.getElementById('statsLoading').style.display = 'block';
-  apiGet({ action: 'stats', adminPin }).then(res => {
-    document.getElementById('statsLoading').style.display = 'none';
-    if (!res.ok) { toast(res.error || '통계를 불러오지 못했습니다.'); return; }
-    const grid = document.getElementById('statsGrid');
-    if (!res.stats.length) { grid.innerHTML = '<div class="empty-state">아직 데이터가 없습니다.</div>'; return; }
-    grid.innerHTML = res.stats.map(s => `
-      <div class="stat-card">
-        <h3>${escapeHtml(s.업체명)}</h3>
-        <div class="stat-line"><span>전체 건수</span><b>${s.전체건수}건</b></div>
-        <div class="stat-line"><span>완료</span><b>${s.완료건수}건</b></div>
-        <div class="stat-line"><span>진행중</span><b>${s.진행중건수}건</b></div>
-        <div class="stat-line"><span>반려율</span><b>${s.반려율}%</b></div>
-        <div class="stat-line"><span>평균 완료 소요일</span><b>${s.평균완료소요일 !== null ? s.평균완료소요일 + '일' : '—'}</b></div>
-      </div>
-    `).join('');
-  }).catch(() => {
-    document.getElementById('statsLoading').style.display = 'none';
-    toast('API 연결에 실패했습니다.');
+/* 수정창에서 동/호수를 바꾸면 도면도 따라 바뀌게 */
+function wireEditPlanPickers() {
+  ['e_dong', 'e_ho'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      const info = lookupUnit(document.getElementById('e_dong').value,
+                              document.getElementById('e_ho').value);
+      document.getElementById('e_typeBadge').innerHTML =
+        info ? '<span class="plan-badge">' + escapeHtml(info.t) + '</span>' : '';
+      if (info && editLoc.type !== info.t) {
+        editLoc = { type: info.t, variant: PLAN_DEFAULT_VARIANT, shapes: [] };
+        renderPlan(document.getElementById('e_planHost'), editLoc, true);
+      }
+    });
   });
+}
+
+/* ---------- 업체별 통계 (화면에서 직접 집계) ---------- */
+// 서버를 한 번 더 부르지 않고, 이미 받아둔 목록으로 계산합니다. 기간 전환이 즉시 됩니다.
+let statPeriod = 'all';
+
+// 막대 색 — dataviz 검증 통과값 (명도대비 3:1 이상, 색각이상 구분 가능)
+const CH = {
+  done:    '#0ca30c',   // 완료
+  wait:    '#b87c00',   // 완료확인대기
+  running: '#2a78d6',   // 진행중
+  idle:    'var(--neutral-bg)',  // 등록됨(미착수) — 맥락용 회색
+  single:  '#6a4fd6'    // 단일 계열 막대
+};
+
+function setPeriod(p) {
+  statPeriod = p;
+  document.querySelectorAll('.period-chip').forEach(c =>
+    c.classList.toggle('active', c.dataset.period === p));
+  renderStats();
+}
+
+function periodStart() {
+  const now = new Date();
+  if (statPeriod === 'month') return new Date(now.getFullYear(), now.getMonth(), 1);
+  if (statPeriod === '30') return new Date(now.getTime() - 30 * 86400000);
+  if (statPeriod === '90') return new Date(now.getTime() - 90 * 86400000);
+  return null;
+}
+
+function computeStats() {
+  const from = periodStart();
+  const rows = allIssues.filter(i => {
+    if (i.상태 === '취소됨') return false;           // 취소 건은 집계에서 제외
+    if (!from) return true;
+    const d = new Date(i.등록일시);
+    return isNaN(d.getTime()) ? true : d >= from;
+  });
+
+  const by = {};
+  rows.forEach(i => {
+    const name = i.담당업체 || '미배정';
+    const s = by[name] || (by[name] = {
+      name, total: 0, done: 0, wait: 0, running: 0, idle: 0,
+      rejected: 0, daySum: 0, dayCnt: 0
+    });
+    s.total++;
+    if (i.상태 === '완료') s.done++;
+    else if (i.상태 === '완료확인대기') s.wait++;
+    else if (i.상태 === '진행중') s.running++;
+    else s.idle++;
+    if (Number(i.반려횟수) > 0) s.rejected++;
+    if (i.상태 === '완료' && i.등록일시 && i.확인일) {
+      const a = new Date(i.등록일시), b = new Date(i.확인일);
+      if (!isNaN(a.getTime()) && !isNaN(b.getTime())) {
+        s.daySum += Math.max(0, Math.round((b - a) / 86400000));
+        s.dayCnt++;
+      }
+    }
+  });
+
+  return Object.values(by).map(s => ({
+    ...s,
+    rejectRate: s.total ? Math.round((s.rejected / s.total) * 100) : 0,
+    avgDays: s.dayCnt ? Math.round((s.daySum / s.dayCnt) * 10) / 10 : null
+  })).sort((a, b) => b.total - a.total);
+}
+
+function seg(width, color, label, ghost) {
+  if (!width) return '';
+  // 글자가 안 들어가는 좁은 조각에는 숫자를 넣지 않습니다 (잘림 방지)
+  const showLabel = width >= 11;
+  return `<div class="bar-seg${ghost ? ' ghost' : ''}" style="width:${width}%;${ghost ? '' : 'background:' + color + ';'}"
+            title="${escapeAttr(label)}">${showLabel ? label.split(' ')[1] : ''}</div>`;
+}
+
+function renderStats() {
+  const stats = computeStats();
+  const host = document.getElementById('statsBody');
+  if (!stats.length) {
+    host.innerHTML = '<div class="figure"><div class="fig-empty">이 기간에 해당하는 이슈가 없습니다.</div></div>';
+    return;
+  }
+
+  const totalAll = stats.reduce((a, s) => a + s.total, 0);
+
+  // ① 업체별 처리 현황 — 가로 누적 막대
+  let html = `<div class="figure">
+    <h3>업체별 처리 현황</h3>
+    <p class="sub">막대 하나가 그 업체의 전체 건수입니다 · 총 ${totalAll}건</p>
+    <div class="legend">
+      <span><i style="background:${CH.done}"></i>완료</span>
+      <span><i style="background:${CH.wait}"></i>완료확인대기</span>
+      <span><i style="background:${CH.running}"></i>진행중</span>
+      <span><i style="background:var(--neutral-bg); border:1px solid var(--gridline);"></i>등록됨(미착수)</span>
+    </div>`;
+  stats.forEach(s => {
+    const pct = v => s.total ? (v / s.total) * 100 : 0;
+    html += `<div class="bar-row">
+      <div class="bar-name">${escapeHtml(s.name)}</div>
+      <div class="bar-track">
+        ${seg(pct(s.done), CH.done, '완료 ' + s.done)}
+        ${seg(pct(s.wait), CH.wait, '완료확인대기 ' + s.wait)}
+        ${seg(pct(s.running), CH.running, '진행중 ' + s.running)}
+        ${seg(pct(s.idle), null, '등록됨 ' + s.idle, true)}
+      </div>
+      <div class="bar-val">${s.total}건</div>
+    </div>`;
+  });
+  html += '</div>';
+
+  // ② 평균 완료 소요일 — 단일 계열이라 범례 없음
+  const withDays = stats.filter(s => s.avgDays !== null);
+  html += `<div class="figure">
+    <h3>평균 완료 소요일</h3>
+    <p class="sub">등록일부터 완료 승인까지 걸린 평균 일수 (완료된 건 기준)</p>`;
+  if (!withDays.length) {
+    html += '<div class="fig-empty">아직 완료된 건이 없어 계산할 수 없습니다.</div>';
+  } else {
+    const max = Math.max(...withDays.map(s => s.avgDays), 1);
+    withDays.sort((a, b) => a.avgDays - b.avgDays).forEach(s => {
+      const w = Math.max(2, (s.avgDays / max) * 100);
+      html += `<div class="bar-row">
+        <div class="bar-name">${escapeHtml(s.name)}</div>
+        <div class="bar-track" style="background:transparent;">
+          <div class="bar-seg" style="width:${w}%; background:${CH.single};"></div>
+        </div>
+        <div class="bar-val">${s.avgDays}일</div>
+      </div>`;
+    });
+  }
+  html += '</div>';
+
+  // ③ 숫자로 보기 (표)
+  html += `<div class="figure">
+    <h3>숫자로 보기</h3>
+    <p class="sub">위 그래프와 같은 데이터입니다</p>
+    <div style="overflow-x:auto;"><table class="statt">
+      <thead><tr><th>업체</th><th>전체</th><th>완료</th><th>진행중</th><th>확인대기</th><th>반려율</th><th>평균소요</th></tr></thead>
+      <tbody>${stats.map(s => `<tr>
+        <td>${escapeHtml(s.name)}</td><td>${s.total}</td><td>${s.done}</td>
+        <td>${s.running}</td><td>${s.wait}</td><td>${s.rejectRate}%</td>
+        <td>${s.avgDays !== null ? s.avgDays + '일' : '—'}</td></tr>`).join('')}
+      </tbody>
+    </table></div>
+  </div>`;
+
+  host.innerHTML = html;
 }
 
 /* ---------- render issue grid ---------- */
@@ -460,43 +740,60 @@ function setFilter(status) {
 }
 
 function renderIssues() {
-  const counts = { __all: allIssues.length, '등록됨': 0, '진행중': 0, '완료확인대기': 0, '완료': 0 };
-  allIssues.forEach(i => { if (counts[i.상태] !== undefined) counts[i.상태]++; });
+  const query = (document.getElementById('searchInput').value || '').trim();
+
+  // 업체 필터를 먼저 적용한 뒤 상태별 숫자를 셉니다.
+  // (업체를 골랐는데 위쪽 숫자는 전체 기준이면 헷갈리기 때문)
+  let scoped = allIssues;
+  if (companyFilter === '__none') scoped = scoped.filter(i => !i.담당업체);
+  else if (companyFilter !== '__all') scoped = scoped.filter(i => i.담당업체 === companyFilter);
+
+  const counts = { '등록됨': 0, '진행중': 0, '완료확인대기': 0, '완료': 0, '취소됨': 0 };
+  scoped.forEach(i => { if (counts[i.상태] !== undefined) counts[i.상태]++; });
+  // "전체"는 취소된 건을 뺀 숫자입니다 — 기본 화면에서 취소 건은 숨기니까요
+  counts.__all = scoped.filter(i => i.상태 !== '취소됨').length;
   Object.keys(counts).forEach(k => {
     const el = document.getElementById('cnt-' + k);
     if (el) el.textContent = counts[k];
   });
+  document.querySelector('.cancel-chip').style.display = counts['취소됨'] ? '' : 'none';
 
-  const query = (document.getElementById('searchInput').value || '').trim();
-  let list = allIssues;
-  if (currentFilter !== '__all') list = list.filter(i => i.상태 === currentFilter);
-  if (companyFilter === '__none') list = list.filter(i => !i.담당업체);
-  else if (companyFilter !== '__all') list = list.filter(i => i.담당업체 === companyFilter);
+  let list = scoped;
+  if (currentFilter === '__all') list = list.filter(i => i.상태 !== '취소됨');  // 기본 화면에서는 숨김
+  else list = list.filter(i => i.상태 === currentFilter);
   if (query) list = list.filter(i =>
     (String(i.동) + String(i.호수)).includes(query) ||
     String(i.카테고리 || '').includes(query) ||
     String(i.문제설명 || '').includes(query));
 
   const grid = document.getElementById('issueGrid');
-  document.getElementById('issueEmpty').style.display = list.length ? 'none' : 'block';
+  const empty = document.getElementById('issueEmpty');
+  empty.style.display = list.length ? 'none' : 'block';
+  empty.textContent = currentFilter === '취소됨'
+    ? '취소된 이슈가 없습니다.'
+    : (allIssues.length ? '조건에 맞는 이슈가 없습니다.'
+                        : '등록된 이슈가 없습니다. 상단의 "새 이슈 등록"으로 시작해보세요.');
+
   grid.innerHTML = list.map(issue => {
     const c = STATUS_COLORS[issue.상태] || STATUS_COLORS['등록됨'];
     const thumbUrl = firstPhoto(issue.요청사진);
     const late = overdueDays(issue);
+    const cancelled = issue.상태 === '취소됨';
     return `
-      <div class="issue-card${late > 0 ? ' overdue' : ''}" onclick="openDetail('${escapeAttr(issue.issue_id)}')">
+      <div class="issue-card${late > 0 ? ' overdue' : ''}${cancelled ? ' cancelled' : ''}" onclick="openDetail('${escapeAttr(issue.issue_id)}')">
         <div class="thumb">${thumbUrl ? photoImgHtml(thumbUrl, true) : '사진 없음'}</div>
         <div class="ho">${unitLabel(issue)}</div>
         <div class="cat">${escapeHtml(issue.카테고리 || '기타')} · ${escapeHtml(issue.담당업체 || '미배정')}</div>
         <div class="badge-row">
           <span class="badge" style="background:${c.bg}; color:${c.text};">${escapeHtml(issue.상태)}</span>
-          ${issue.우선순위 === '긴급' ? '<span class="badge urgent">긴급</span>' : ''}
-          ${late > 0 ? `<span class="badge late">${late}일 지연</span>` : ''}
+          ${!cancelled && issue.우선순위 === '긴급' ? '<span class="badge urgent">긴급</span>' : ''}
+          ${!cancelled && late > 0 ? `<span class="badge late">${late}일 지연</span>` : ''}
         </div>
       </div>
     `;
   }).join('');
   wirePhotoFallbacks(grid);
+  saveViewState();
 }
 
 /* "101" + "1034" -> "101동 1034호" (이미 동/호가 붙어 있으면 그대로 둡니다) */
@@ -528,7 +825,7 @@ function firstPhoto(csv) {
 
 /* ---------- create issue ---------- */
 /* 동 목록 채우기 + 동이 바뀌면 호수 목록 갱신 + 타입 판별해서 평면도 표시 */
-let createLoc = { type: '', variant: PLAN_DEFAULT_VARIANT, pts: [] };
+let createLoc = { type: '', variant: PLAN_DEFAULT_VARIANT, shapes: [] };
 
 function initUnitPickers() {
   document.getElementById('dongList').innerHTML =
@@ -556,7 +853,7 @@ function updateCreatePlan() {
 
   if (!info) {
     badge.innerHTML = '';
-    createLoc = { type: '', variant: PLAN_DEFAULT_VARIANT, pts: [] };
+    createLoc = { type: '', variant: PLAN_DEFAULT_VARIANT, shapes: [] };
     host.innerHTML = '<div class="plan-box"><div class="plan-none">' +
       '동·호수를 입력하면 그 세대의 평면도가 나타납니다.<br>' +
       '골조·공용부처럼 도면이 없는 곳은 비워두고 사진으로만 지시하셔도 됩니다.</div></div>';
@@ -565,7 +862,7 @@ function updateCreatePlan() {
   badge.innerHTML = '<span class="plan-badge">' + escapeHtml(info.t) + '</span>';
   // 타입이 바뀌었을 때만 초기화 (같은 세대면 찍어둔 핀 유지)
   if (createLoc.type !== info.t) {
-    createLoc = { type: info.t, variant: PLAN_DEFAULT_VARIANT, pts: [] };
+    createLoc = { type: info.t, variant: PLAN_DEFAULT_VARIANT, shapes: [] };
   }
   renderPlan(host, createLoc, true);
 }
@@ -574,7 +871,7 @@ function openCreateModal() {
   document.getElementById('c_dong').value = '';
   document.getElementById('c_ho').value = '';
   document.getElementById('c_cat').value = '';
-  createLoc = { type: '', variant: PLAN_DEFAULT_VARIANT, pts: [] };
+  createLoc = { type: '', variant: PLAN_DEFAULT_VARIANT, shapes: [] };
   document.getElementById('c_desc').value = '';
   document.getElementById('c_instruction').value = '';
   document.getElementById('c_due').value = '';
@@ -649,22 +946,230 @@ function submitCreate() {
     담당업체: companyName,
     담당업체연락처: companyContact,
     지시사항: document.getElementById('c_instruction').value.trim(),
-    위치: buildLoc(createLoc.type, createLoc.variant, createLoc.pts),
+    위치: buildLoc(createLoc.type, createLoc.variant, createLoc.shapes),
     photos: pendingPhotos.createPreview
   };
 
-  toast('등록 중...');
-  apiPost('createIssue', body).then(res => {
-    if (!res.ok) { toast(res.error || '등록 실패'); return; }
-    toast('등록되었습니다: ' + res.issue_id);
-    closeModal('createOverlay');
-    loadAll();
-  }).catch(() => toast('API 연결에 실패했습니다.'));
+  withBusy('c_submit', '등록 중...', () =>
+    apiPost('createIssue', body).then(res => {
+      if (!res.ok) { toast(res.error || '등록 실패'); return; }
+      toast('등록되었습니다: ' + res.issue_id);
+      closeModal('createOverlay');
+      loadAll();
+    }));
 }
+
+/* ---------- 수정 · 취소 · 삭제 ---------- */
+// 서버(Code.gs)의 EDITABLE 과 같은 규칙입니다. 화면에서 미리 막아 헛수고를 줄입니다.
+const EDITABLE_BY_STATUS = {
+  '등록됨': ['동','호수','카테고리','문제설명','우선순위','희망완료일','지시사항','위치','담당업체'],
+  '진행중': ['카테고리','문제설명','우선순위','희망완료일','지시사항','위치','담당업체'],
+  '완료확인대기': ['우선순위','희망완료일','지시사항'],
+  '완료': [],
+  '취소됨': []
+};
+const EDIT_NOTE = {
+  '진행중': '업체가 이미 작업 중이라 <b>동·호수는 바꿀 수 없습니다.</b> 호수를 바꿔야 하면 취소하고 새로 등록해주세요.',
+  '완료확인대기': '업체가 완료 보고를 올린 상태라 <b>우선순위·희망완료일·지시사항만</b> 고칠 수 있습니다.'
+};
+
+let editingId = null;
+let editLoc = { type: '', variant: PLAN_DEFAULT_VARIANT, shapes: [] };
+let cancelingId = null;
+let deletingId = null;
+
+function openEditModal(issueId) {
+  const issue = allIssues.find(i => i.issue_id === issueId);
+  if (!issue) return;
+  editingId = issueId;
+  const allow = EDITABLE_BY_STATUS[issue.상태] || [];
+  if (!allow.length) { toast(`"${issue.상태}" 상태에서는 수정할 수 없습니다.`); return; }
+
+  document.getElementById('e_title').textContent = unitLabel(issue) + ' · ' + issue.issue_id + ' 수정';
+  const note = document.getElementById('e_note');
+  if (EDIT_NOTE[issue.상태]) { note.innerHTML = EDIT_NOTE[issue.상태]; note.style.display = 'block'; }
+  else { note.style.display = 'none'; }
+
+  const set = (id, val, field) => {
+    const el = document.getElementById(id);
+    el.value = val == null ? '' : val;
+    const wrap = el.closest('.field');
+    const ok = allow.indexOf(field) >= 0;
+    el.disabled = !ok;
+    if (wrap) wrap.style.opacity = ok ? '1' : '.45';
+  };
+  set('e_dong', issue.동, '동');
+  set('e_ho', issue.호수, '호수');
+  set('e_cat', issue.카테고리, '카테고리');
+  set('e_desc', issue.문제설명, '문제설명');
+  set('e_priority', issue.우선순위 || '보통', '우선순위');
+  set('e_due', issue.희망완료일, '희망완료일');
+  set('e_instruction', issue.지시사항, '지시사항');
+
+  const sel = document.getElementById('e_company');
+  sel.innerHTML = '<option value="">— 미배정 —</option>' +
+    companies.map(c => `<option value="${escapeAttr(c.name)}" data-contact="${escapeAttr(c.contact||'')}">${escapeHtml(c.name)}</option>`).join('');
+  set('e_company', issue.담당업체 || '', '담당업체');
+
+  // 도면
+  const canPlan = allow.indexOf('위치') >= 0;
+  const saved = parseLoc(issue.위치);
+  const info = lookupUnit(issue.동, issue.호수);
+  document.getElementById('e_typeBadge').innerHTML =
+    info ? '<span class="plan-badge">' + escapeHtml(info.t) + '</span>' : '';
+  if (saved && saved.shapes.length) {
+    editLoc = { type: saved.type, variant: saved.variant, shapes: saved.shapes.slice() };
+  } else if (info) {
+    editLoc = { type: info.t, variant: PLAN_DEFAULT_VARIANT, shapes: [] };
+  } else {
+    editLoc = { type: '', variant: PLAN_DEFAULT_VARIANT, shapes: [] };
+  }
+  document.getElementById('e_planField').style.display = canPlan ? '' : 'none';
+  if (canPlan) renderPlan(document.getElementById('e_planHost'), editLoc, true);
+
+  document.getElementById('editOverlay').classList.add('active');
+}
+
+function submitEdit() {
+  const issue = allIssues.find(i => i.issue_id === editingId);
+  if (!issue) return;
+  const allow = EDITABLE_BY_STATUS[issue.상태] || [];
+  const body = { adminPin, issue_id: editingId };
+  const grab = (field, id) => {
+    if (allow.indexOf(field) < 0) return;
+    const el = document.getElementById(id);
+    body[field] = (el.value || '').trim();
+  };
+  grab('동','e_dong'); grab('호수','e_ho'); grab('카테고리','e_cat');
+  grab('문제설명','e_desc'); grab('우선순위','e_priority');
+  grab('희망완료일','e_due'); grab('지시사항','e_instruction');
+  if (allow.indexOf('담당업체') >= 0) {
+    const sel = document.getElementById('e_company');
+    body.담당업체 = sel.value;
+    body.담당업체연락처 = sel.value ? (sel.selectedOptions[0].dataset.contact || '') : '';
+  }
+  if (allow.indexOf('위치') >= 0) {
+    body.위치 = buildLoc(editLoc.type, editLoc.variant, editLoc.shapes);
+  }
+  if (body.동 !== undefined && (!body.동 || !body.호수)) { toast('동/호수를 입력해주세요.'); return; }
+
+  withBusy('e_submit', '저장 중...', () =>
+    apiPost('updateIssue', body).then(res => {
+      if (!res.ok) { toast(res.error || '수정 실패'); return; }
+      toast(res.changed && res.changed.length ? '수정되었습니다.' : '바뀐 내용이 없습니다.');
+      closeModal('editOverlay');
+      closeModal('detailOverlay');
+      loadAll();
+    }));
+}
+
+function askCancel(issueId) {
+  const issue = allIssues.find(i => i.issue_id === issueId);
+  if (!issue) return;
+  cancelingId = issueId;
+  document.getElementById('x_title').textContent = unitLabel(issue) + ' · ' + issueId + ' 취소';
+  document.getElementById('x_reason').value = '';
+  document.getElementById('cancelOverlay').classList.add('active');
+}
+
+function submitCancel() {
+  const reason = document.getElementById('x_reason').value.trim();
+  if (!reason) { toast('취소 사유를 입력해주세요.'); return; }
+  withBusy('x_submit', '처리 중...', () =>
+    apiPost('cancelIssue', { adminPin, issue_id: cancelingId, 취소사유: reason }).then(res => {
+      if (!res.ok) { toast(res.error || '취소 실패'); return; }
+      toast('취소 처리했습니다. "취소함"에서 볼 수 있습니다.');
+      closeModal('cancelOverlay');
+      closeModal('detailOverlay');
+      loadAll();
+    }));
+}
+
+function askDelete(issueId) {
+  const issue = allIssues.find(i => i.issue_id === issueId);
+  if (!issue) return;
+  deletingId = issueId;
+  document.getElementById('d_delTarget').textContent = unitLabel(issue) + ' · ' + issueId;
+  document.getElementById('delOverlay').classList.add('active');
+}
+
+function submitDelete() {
+  withBusy('del_submit', '삭제 중...', () =>
+    apiPost('deleteIssue', { adminPin, issue_id: deletingId }).then(res => {
+      if (!res.ok) { toast(res.error || '삭제 실패'); return; }
+      toast('삭제했습니다.');
+      closeModal('delOverlay');
+      closeModal('detailOverlay');
+      loadAll();
+    }));
+}
+
+/* ---------- 전송 중 버튼 잠금 ---------- */
+// 연타하면 같은 건이 여러 개 만들어지므로, 응답이 올 때까지 버튼을 잠급니다.
+function withBusy(btnId, label, fn) {
+  const btn = document.getElementById(btnId);
+  if (btn) {
+    if (btn.dataset.busy === '1') return;      // 이미 보내는 중이면 무시
+    btn.dataset.busy = '1';
+    btn.dataset.label = btn.textContent;
+    btn.textContent = label;
+    btn.disabled = true;
+  }
+  toast(label);
+  const done = () => {
+    if (!btn) return;
+    btn.dataset.busy = '';
+    btn.textContent = btn.dataset.label || btn.textContent;
+    btn.disabled = false;
+  };
+  let p;
+  try { p = fn(); } catch (e) { done(); throw e; }
+  return Promise.resolve(p)
+    .catch(() => toast('접속에 실패했습니다. 잠시 후 다시 시도해주세요.'))
+    .then(done);
+}
+
+/* ---------- 보던 조건 기억 ---------- */
+function saveViewState() {
+  try {
+    localStorage.setItem('as_admin_view', JSON.stringify({
+      status: currentFilter, company: companyFilter,
+      q: (document.getElementById('searchInput') || {}).value || ''
+    }));
+  } catch (e) {}
+}
+
+function restoreViewState() {
+  try {
+    const raw = localStorage.getItem('as_admin_view');
+    if (!raw) return;
+    const v = JSON.parse(raw);
+    if (v.status) currentFilter = v.status;
+    if (v.company) companyFilter = v.company;
+    if (v.q) document.getElementById('searchInput').value = v.q;
+    document.querySelectorAll('.chip[data-status]').forEach(c =>
+      c.classList.toggle('active', c.dataset.status === currentFilter));
+  } catch (e) {}
+}
+
+/* ---------- 자동 로그아웃 ---------- */
+// 현장 공용 PC에서 다음 사람이 그대로 들어가는 것을 막습니다.
+const IDLE_LIMIT_MS = 30 * 60 * 1000;   // 30분
+let idleTimer = null;
+function resetIdleTimer() {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    localStorage.removeItem('as_admin_pin');
+    alert('30분 동안 사용이 없어 자동 로그아웃되었습니다.');
+    location.reload();
+  }, IDLE_LIMIT_MS);
+}
+['click', 'keydown', 'touchstart'].forEach(ev =>
+  document.addEventListener(ev, resetIdleTimer, { passive: true }));
 
 /* ---------- issue detail ---------- */
 let detailPhotos = { reject: [] };
-let detailLoc = { type: '', variant: PLAN_DEFAULT_VARIANT, pts: [] };
+let detailLoc = { type: '', variant: PLAN_DEFAULT_VARIANT, shapes: [] };
 
 function openDetail(issueId) {
   const issue = allIssues.find(i => i.issue_id === issueId);
@@ -677,7 +1182,25 @@ function openDetail(issueId) {
   const reqPhotos = String(issue.요청사진 || '').split(',').filter(Boolean);
   const donePhotos = String(issue.완료사진 || '').split(',').filter(Boolean);
 
-  let html = `
+  const cancelled = issue.상태 === '취소됨';
+  const editable = (EDITABLE_BY_STATUS[issue.상태] || []).length > 0;
+
+  let html = '';
+  html += '<div class="detail-actions">';
+  if (editable) html += `<button type="button" class="mini" onclick="openEditModal('${escapeAttr(issue.issue_id)}')">✏️ 수정</button>`;
+  if (!cancelled && issue.상태 !== '완료') {
+    html += `<button type="button" class="mini warn" onclick="askCancel('${escapeAttr(issue.issue_id)}')">취소</button>`;
+  }
+  if (cancelled) {
+    html += `<button type="button" class="mini danger" onclick="askDelete('${escapeAttr(issue.issue_id)}')">🗑 완전 삭제</button>`;
+  }
+  html += '</div>';
+
+  if (cancelled) {
+    html += `<div class="cancel-note"><b>취소된 건입니다.</b><br>사유: ${escapeHtml(issue.취소사유 || '-')}</div>`;
+  }
+
+  html += `
     <div class="detail-row"><b>상태:</b> ${escapeHtml(issue.상태)}</div>
     <div class="detail-row"><b>카테고리:</b> ${escapeHtml(issue.카테고리 || '-')} · <b>우선순위:</b> ${escapeHtml(issue.우선순위 || '-')}</div>
     <div class="detail-row"><b>문제설명:</b> ${escapeHtml(issue.문제설명 || '-')}</div>
@@ -687,7 +1210,12 @@ function openDetail(issueId) {
     </div>
   `;
 
-  if (!issue.담당업체) {
+  if (cancelled) {
+    html += `
+      <div class="detail-row"><b>담당업체:</b> ${escapeHtml(issue.담당업체 || '미배정')}</div>
+      <div class="detail-row"><b>지시사항:</b> ${escapeHtml(issue.지시사항||'-')}</div>
+    `;
+  } else if (!issue.담당업체) {
     // 미배정 → 배정 폼
     html += `
       <div class="field"><label>담당 업체</label>
@@ -708,7 +1236,7 @@ function openDetail(issueId) {
       </div>
       <div class="field"><label>작업 지시사항</label><textarea id="assign_instruction">${escapeHtml(issue.지시사항||'')}</textarea></div>
       <div class="modal-actions">
-        <button class="btn-primary" onclick="submitAssign('${escapeAttr(issue.issue_id)}')">업체에게 지시 보내기</button>
+        <button class="btn-primary" id="a_submit" onclick="submitAssign('${escapeAttr(issue.issue_id)}')">업체에게 지시 보내기</button>
       </div>
     `;
   } else {
@@ -719,23 +1247,27 @@ function openDetail(issueId) {
     `;
   }
 
-  if (issue.상태 === '완료확인대기') {
+  if (!cancelled && issue.상태 === '완료확인대기') {
     html += `
       <div class="compare-photos">${photoBoxHtml(donePhotos, '완료 사진')}</div>
       <div class="detail-row"><b>업체 메모:</b> ${escapeHtml(issue.업체메모||'-')}</div>
       <div class="field"><label>반려 사유 (반려 시 입력)</label><textarea id="reject_reason"></textarea></div>
       <div class="modal-actions">
-        <button class="btn-reject" onclick="submitConfirm('${escapeAttr(issue.issue_id)}', false)">반려</button>
-        <button class="btn-approve" onclick="submitConfirm('${escapeAttr(issue.issue_id)}', true)">완료 승인</button>
+        <button class="btn-reject" id="cf_reject" onclick="submitConfirm('${escapeAttr(issue.issue_id)}', false)">반려</button>
+        <button class="btn-approve" id="cf_approve" onclick="submitConfirm('${escapeAttr(issue.issue_id)}', true)">완료 승인</button>
       </div>
     `;
-  } else if (issue.상태 === '완료') {
+  } else if (!cancelled && issue.상태 === '완료') {
     html += `
       <div class="compare-photos">${photoBoxHtml(donePhotos, '완료 사진')}</div>
       <div class="detail-row"><b>확인자:</b> ${escapeHtml(issue.확인자||'-')} · <b>확인일:</b> ${formatDate(issue.확인일)}</div>
     `;
-  } else if (issue.반려사유) {
+  } else if (!cancelled && issue.반려사유) {
     html += `<div class="detail-row"><b>최근 반려 사유:</b> ${escapeHtml(issue.반려사유)}</div>`;
+  }
+
+  if (issue.수정이력) {
+    html += `<details class="history"><summary>변경 이력</summary><pre>${escapeHtml(issue.수정이력)}</pre></details>`;
   }
 
   const body = document.getElementById('d_body');
@@ -746,21 +1278,21 @@ function openDetail(issueId) {
   const planHost = document.getElementById('d_planHost');
   const saved = parseLoc(issue.위치);
   const info = lookupUnit(issue.동, issue.호수);
-  if (saved && saved.pts.length) {
-    detailLoc = { type: saved.type, variant: saved.variant, pts: saved.pts.slice() };
+  if (saved && saved.shapes.length) {
+    detailLoc = { type: saved.type, variant: saved.variant, shapes: saved.shapes.slice() };
     planHost.innerHTML = '<div class="detail-row" style="margin-top:10px;"><b>도면 위치</b> ' +
       '<span class="plan-badge">' + escapeHtml(saved.type) + ' · ' + escapeHtml(saved.variant) + '</span></div>' +
       '<div id="d_planInner"></div>';
     renderPlan(document.getElementById('d_planInner'), detailLoc, false);
-  } else if (info && !issue.담당업체) {
+  } else if (info && !issue.담당업체 && !cancelled) {
     // 아직 배정 전이면 이 자리에서 위치를 지정할 수 있게
-    detailLoc = { type: info.t, variant: PLAN_DEFAULT_VARIANT, pts: [] };
+    detailLoc = { type: info.t, variant: PLAN_DEFAULT_VARIANT, shapes: [] };
     planHost.innerHTML = '<div class="detail-row" style="margin-top:10px;"><b>도면 위치</b> ' +
       '<span style="color:var(--text-muted);">아직 표시 안 됨 — 아래에서 찍으면 배정할 때 같이 저장됩니다</span></div>' +
       '<div id="d_planInner"></div>';
     renderPlan(document.getElementById('d_planInner'), detailLoc, true);
   } else {
-    detailLoc = { type: '', variant: PLAN_DEFAULT_VARIANT, pts: [] };
+    detailLoc = { type: '', variant: PLAN_DEFAULT_VARIANT, shapes: [] };
     planHost.innerHTML = '';
   }
 
@@ -787,28 +1319,28 @@ function submitAssign(issueId) {
     우선순위: document.getElementById('assign_priority').value,
     희망완료일: document.getElementById('assign_due').value,
     지시사항: document.getElementById('assign_instruction').value.trim(),
-    위치: buildLoc(detailLoc.type, detailLoc.variant, detailLoc.pts)
+    위치: buildLoc(detailLoc.type, detailLoc.variant, detailLoc.shapes)
   };
-  toast('배정 중...');
-  apiPost('assignIssue', body).then(res => {
-    if (!res.ok) { toast(res.error || '배정 실패'); return; }
-    toast('배정되었습니다.');
-    closeModal('detailOverlay');
-    loadAll();
-  }).catch(() => toast('API 연결에 실패했습니다.'));
+  withBusy('a_submit', '배정 중...', () =>
+    apiPost('assignIssue', body).then(res => {
+      if (!res.ok) { toast(res.error || '배정 실패'); return; }
+      toast('배정되었습니다.');
+      closeModal('detailOverlay');
+      loadAll();
+    }));
 }
 
 function submitConfirm(issueId, approve) {
   const reason = document.getElementById('reject_reason') ? document.getElementById('reject_reason').value.trim() : '';
   if (!approve && !reason) { toast('반려 사유를 입력해주세요.'); return; }
   const body = { adminPin, issue_id: issueId, approve, 반려사유: reason, 확인자: '관리팀' };
-  toast(approve ? '승인 처리 중...' : '반려 처리 중...');
-  apiPost('confirmCompletion', body).then(res => {
-    if (!res.ok) { toast(res.error || '처리 실패'); return; }
-    toast(approve ? '완료 승인되었습니다.' : '반려 처리되었습니다.');
-    closeModal('detailOverlay');
-    loadAll();
-  }).catch(() => toast('API 연결에 실패했습니다.'));
+  withBusy(approve ? 'cf_approve' : 'cf_reject', approve ? '승인 처리 중...' : '반려 처리 중...', () =>
+    apiPost('confirmCompletion', body).then(res => {
+      if (!res.ok) { toast(res.error || '처리 실패'); return; }
+      toast(approve ? '완료 승인되었습니다.' : '반려 처리되었습니다.');
+      closeModal('detailOverlay');
+      loadAll();
+    }));
 }
 
 /* =======================================================================
@@ -858,42 +1390,89 @@ function parseLoc(s) {
   if (!s) return null;
   var p = String(s).split('|');
   if (p.length < 3) return null;
-  var pts = [];
-  p[2].split(';').forEach(function (seg) {
+  var body = p[2] || '';
+  var shapes = [];
+  // "R:x,y,w,h;..." 는 영역, 그냥 "x,y;..." 는 예전 방식(핀)입니다.
+  var isRegion = body.indexOf('R:') === 0;
+  if (isRegion) body = body.slice(2);
+  body.split(';').forEach(function (seg) {
     if (!seg) return;
-    var xy = seg.split(',');
-    var x = parseFloat(xy[0]), y = parseFloat(xy[1]);
-    if (isFinite(x) && isFinite(y)) pts.push({ x: x, y: y });
+    var v = seg.split(',').map(parseFloat);
+    if (isRegion) {
+      if (v.length >= 4 && v.every(isFinite)) {
+        shapes.push({ t: 'r', x: v[0], y: v[1], w: v[2], h: v[3] });
+      }
+    } else if (v.length >= 2 && isFinite(v[0]) && isFinite(v[1])) {
+      shapes.push({ t: 'p', x: v[0], y: v[1] });
+    }
   });
-  return { type: p[0], variant: p[1] || '기본형', pts: pts };
+  return { type: p[0], variant: p[1] || '기본형', shapes: shapes };
 }
 
-function buildLoc(type, variant, pts) {
-  if (!type || !pts || !pts.length) return '';
-  return type + '|' + variant + '|' + pts.map(function (p) {
-    return p.x.toFixed(3) + ',' + p.y.toFixed(3);
+function buildLoc(type, variant, shapes) {
+  if (!type || !shapes || !shapes.length) return '';
+  var f = function (v) { return v.toFixed(3); };
+  // 하나라도 영역이 있으면 영역 형식으로 저장합니다 (핀은 아주 작은 영역으로 변환)
+  var anyRegion = shapes.some(function (s) { return s.t === 'r'; });
+  if (!anyRegion) {
+    return type + '|' + variant + '|' +
+      shapes.map(function (s) { return f(s.x) + ',' + f(s.y); }).join(';');
+  }
+  return type + '|' + variant + '|R:' + shapes.map(function (s) {
+    if (s.t === 'r') return [s.x, s.y, s.w, s.h].map(f).join(',');
+    return [Math.max(0, s.x - 0.02), Math.max(0, s.y - 0.02), 0.04, 0.04].map(f).join(',');
   }).join(';');
 }
 
-function pinsHtml(pts) {
-  return pts.map(function (p, i) {
-    return '<div class="plan-pin" style="left:' + (p.x * 100) + '%; top:' + (p.y * 100) + '%;">' +
+function shapesHtml(shapes) {
+  return shapes.map(function (s, i) {
+    if (s.t === 'r') {
+      return '<div class="plan-rgn" style="left:' + (s.x * 100) + '%; top:' + (s.y * 100) +
+             '%; width:' + (s.w * 100) + '%; height:' + (s.h * 100) + '%;">' +
+             '<span class="r-num">' + (i + 1) + '</span></div>';
+    }
+    return '<div class="plan-pin" style="left:' + (s.x * 100) + '%; top:' + (s.y * 100) + '%;">' +
            '<div class="p-dot"></div><div class="p-num">' + (i + 1) + '</div></div>';
   }).join('');
+}
+
+/* ---- 도면 크게 보기 ---- */
+function ensurePlanZoom() {
+  if (document.getElementById('planZoom')) return;
+  var z = document.createElement('div');
+  z.id = 'planZoom';
+  z.className = 'plan-zoom';
+  z.innerHTML = '<button type="button" class="plan-zoom-close" aria-label="닫기">✕</button>' +
+                '<div class="plan-zoom-inner"><div class="plan-zoom-stage"></div></div>';
+  document.body.appendChild(z);
+  z.querySelector('.plan-zoom-close').addEventListener('click', function () { z.classList.remove('open'); });
+  z.addEventListener('click', function (e) { if (e.target === z) z.classList.remove('open'); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') z.classList.remove('open');
+  });
+}
+
+function openPlanZoom(src, shapes) {
+  ensurePlanZoom();
+  var z = document.getElementById('planZoom');
+  z.querySelector('.plan-zoom-stage').innerHTML =
+    '<img src="' + escapeAttr(src) + '" alt="평면도 크게 보기">' + shapesHtml(shapes);
+  z.classList.add('open');
 }
 
 /**
  * 평면도를 그립니다.
  *  host     : 그려 넣을 요소
- *  state    : { type, variant, pts }  — pickable이면 이 객체를 직접 고칩니다
- *  pickable : true면 눌러서 핀을 찍을 수 있음
- *  onChange : 핀이 바뀔 때 호출
+ *  state    : { type, variant, shapes }
+ *  pickable : true면 드래그해서 영역을 표시할 수 있음
  */
 function renderPlan(host, state, pickable, onChange) {
   if (!host) return;
+  if (!state.shapes) state.shapes = [];
   if (!state || !state.type) {
     host.innerHTML = '<div class="plan-box"><div class="plan-none">' +
-      '도면을 찾을 수 없는 호수입니다.<br>동·호수를 정확히 고르면 평면도가 나타납니다.</div></div>';
+      '동·호수를 입력하면 그 세대의 평면도가 나타납니다.<br>' +
+      '골조·공용부처럼 도면이 없는 곳은 비워두고 사진으로만 지시하셔도 됩니다.</div></div>';
     return;
   }
   host.innerHTML = '<div class="plan-box"><div class="plan-none">평면도 불러오는 중…</div></div>';
@@ -914,41 +1493,98 @@ function renderPlan(host, state, pickable, onChange) {
         '</div></div>';
       return;
     }
-    var html = '<div class="plan-box' + (pickable ? ' pickable' : '') + '" data-plan="1">' +
-               '<img src="' + escapeAttr(src) + '" alt="평면도">' + pinsHtml(state.pts) + '</div>';
+    var html = '<div class="plan-box' + (pickable ? ' pickable' : '') + '">' +
+               '<img src="' + escapeAttr(src) + '" alt="평면도">' + shapesHtml(state.shapes) +
+               '<button type="button" class="plan-zoom-btn" data-plan-zoom="1">🔍 크게</button>' +
+               '</div>';
     if (pickable) {
       html += '<div class="plan-tools">' +
               '<button type="button" class="vbtn ghost" data-plan-undo="1">되돌리기</button>' +
               '<button type="button" class="vbtn ghost" data-plan-clear="1">모두 지우기</button>' +
               '</div>' +
-              '<div class="plan-hint">도면에서 문제가 있는 지점을 눌러주세요. 여러 곳을 찍어도 됩니다. ' +
-              '현재 <b>' + state.pts.length + '곳</b> 표시됨.' +
+              '<div class="plan-hint">문제가 있는 <b>범위를 드래그</b>해서 네모로 표시해주세요. ' +
+              '짧게 톡 누르면 점으로도 찍힙니다. 현재 <b>' + state.shapes.length + '곳</b>.' +
               (state.variant !== '확장형'
                 ? '<br>이 타입은 확장형 도면이 없어 <b>기본형</b>으로 표시했습니다.' : '') +
               '</div>';
+    } else {
+      html += '<div class="plan-hint">🔍 크게 를 누르면 도면을 확대해서 볼 수 있습니다.</div>';
     }
     host.innerHTML = html;
 
-    if (!pickable) return;
     var box = host.querySelector('.plan-box');
-    box.addEventListener('click', function (e) {
+    var zoomBtn = host.querySelector('[data-plan-zoom]');
+    if (zoomBtn) zoomBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      openPlanZoom(src, state.shapes);
+    });
+    if (!pickable) return;
+
+    // ---- 드래그로 영역 표시 ----
+    var drag = null;
+    function rel(ev) {
       var r = box.getBoundingClientRect();
-      var x = (e.clientX - r.left) / r.width;
-      var y = (e.clientY - r.top) / r.height;
-      if (x < 0 || x > 1 || y < 0 || y > 1) return;
-      state.pts.push({ x: x, y: y });
+      var t = (ev.touches && ev.touches.length) ? ev.touches[0]
+            : (ev.changedTouches && ev.changedTouches.length) ? ev.changedTouches[0] : ev;
+      if (typeof t.clientX !== 'number') return null;
+      return { x: Math.min(1, Math.max(0, (t.clientX - r.left) / r.width)),
+               y: Math.min(1, Math.max(0, (t.clientY - r.top) / r.height)) };
+    }
+    function preview(b) {
+      var old = box.querySelector('.plan-rgn.preview');
+      if (old) old.remove();
+      if (!b) return;
+      var el = document.createElement('div');
+      el.className = 'plan-rgn preview';
+      el.style.left = (b.x * 100) + '%'; el.style.top = (b.y * 100) + '%';
+      el.style.width = (b.w * 100) + '%'; el.style.height = (b.h * 100) + '%';
+      box.appendChild(el);
+    }
+    function boxOf(x1, y1, x2, y2) {
+      return { t: 'r', x: Math.min(x1, x2), y: Math.min(y1, y2),
+               w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) };
+    }
+    function onDown(ev) {
+      if (ev.target.closest('[data-plan-zoom]')) return;
+      var p = rel(ev); if (!p) return;
+      drag = { sx: p.x, sy: p.y };
+      if (ev.cancelable) ev.preventDefault();
+    }
+    function onMove(ev) {
+      if (!drag) return;
+      var p = rel(ev); if (!p) return;
+      preview(boxOf(drag.sx, drag.sy, p.x, p.y));
+      if (ev.cancelable) ev.preventDefault();
+    }
+    function onUp(ev) {
+      if (!drag) return;
+      var p = rel(ev);
+      var b = p ? boxOf(drag.sx, drag.sy, p.x, p.y) : null;
+      drag = null;
+      preview(null);
+      if (!b) return;
+      // 거의 안 움직였으면 "점 찍기"로 처리
+      if (b.w < 0.025 || b.h < 0.025) state.shapes.push({ t: 'p', x: b.x + b.w / 2, y: b.y + b.h / 2 });
+      else state.shapes.push(b);
       renderPlan(host, state, true, onChange);
       if (onChange) onChange(state);
-    });
+    }
+    box.addEventListener('mousedown', onDown);
+    box.addEventListener('touchstart', onDown, { passive: false });
+    window.addEventListener('mousemove', onMove);
+    box.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('mouseup', onUp);
+    box.addEventListener('touchend', onUp);
+
     var undo = host.querySelector('[data-plan-undo]');
     if (undo) undo.addEventListener('click', function () {
-      state.pts.pop();
+      state.shapes.pop();
       renderPlan(host, state, true, onChange);
       if (onChange) onChange(state);
     });
     var clr = host.querySelector('[data-plan-clear]');
     if (clr) clr.addEventListener('click', function () {
-      state.pts = [];
+      state.shapes = [];
       renderPlan(host, state, true, onChange);
       if (onChange) onChange(state);
     });
@@ -1074,6 +1710,7 @@ function formatDate(v) {
 
 document.getElementById('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 initUnitPickers();
+wireEditPlanPickers();
 tryAutoLogin();
 </script>
 </body>

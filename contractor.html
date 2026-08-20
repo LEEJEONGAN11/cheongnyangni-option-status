@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -56,6 +55,9 @@
   .work-item .info { flex:1; min-width:0; }
   .work-item .ho { font-size:13.5px; font-weight:800; }
   .work-item .task { font-size:12px; color: var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .work-item.cancelled { opacity:.6; }
+  .work-item.cancelled .thumb { filter:grayscale(1); }
+  .detail-row, .modal h2 { overflow-wrap:anywhere; word-break:break-word; }
   .badge { display:inline-block; font-size:10px; font-weight:800; padding:4px 9px; border-radius:999px; margin-top:4px; }
   .empty-state { text-align:center; padding: 50px 20px; color: var(--text-muted); font-size:13px; }
   .loading-note { font-size:12.5px; color: var(--text-muted); text-align:center; padding: 30px; }
@@ -88,6 +90,26 @@
   .plan-pin .p-num { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
                      color:#fff; font-size:11px; font-weight:800; }
   .plan-none { padding:22px 14px; text-align:center; font-size:12px; color:var(--text-muted); line-height:1.7; }
+
+  .plan-rgn { position:absolute; border:2.5px solid var(--danger); background:rgba(214,66,42,.16);
+              border-radius:3px; pointer-events:none; }
+  .plan-rgn.preview { border-style:dashed; }
+  .plan-rgn .r-num { position:absolute; top:-10px; left:-10px; width:19px; height:19px; border-radius:50%;
+                     background:var(--danger); color:#fff; font-size:10.5px; font-weight:800;
+                     display:flex; align-items:center; justify-content:center; border:2px solid #fff; }
+  .plan-box.pickable { cursor:crosshair; touch-action:none; user-select:none; }
+  .plan-zoom-btn { position:absolute; right:8px; bottom:8px; padding:6px 11px; border-radius:999px;
+                   border:1px solid rgba(0,0,0,.15); background:rgba(255,255,255,.94);
+                   font-size:11.5px; font-weight:700; cursor:pointer; font-family:inherit; z-index:2; }
+  .plan-zoom { position:fixed; inset:0; background:rgba(0,0,0,.9); display:none;
+               align-items:center; justify-content:center; z-index:300; padding:16px; }
+  .plan-zoom.open { display:flex; }
+  .plan-zoom-inner { max-width:100%; max-height:100%; overflow:auto; -webkit-overflow-scrolling:touch; }
+  .plan-zoom-stage { position:relative; display:inline-block; }
+  .plan-zoom-stage img { display:block; max-width:none; width:min(1400px, 92vw); background:#fff; border-radius:4px; }
+  .plan-zoom-close { position:fixed; top:16px; right:18px; width:38px; height:38px; border-radius:999px;
+                     background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.35);
+                     color:#fff; font-size:17px; cursor:pointer; z-index:301; }
   .plan-hint { font-size:11.5px; color:var(--text-muted); margin-top:2px; line-height:1.65; }
 
   .field { margin-bottom: 12px; }
@@ -136,6 +158,7 @@
     <span class="chip" data-status="진행중" onclick="setFilter('진행중')">진행중</span>
     <span class="chip" data-status="완료확인대기" onclick="setFilter('완료확인대기')">확인대기</span>
     <span class="chip" data-status="완료" onclick="setFilter('완료')">완료</span>
+    <span class="chip" data-status="취소됨" onclick="setFilter('취소됨')">취소됨</span>
   </div>
 
   <div id="workList"></div>
@@ -158,13 +181,14 @@
    설정 — 배포 후 이 값만 본인의 Apps Script 웹 앱 URL로 바꾸세요
    (admin.html과 반드시 같은 주소여야 합니다)
    ========================================================= */
-const API_URL = 'https://script.google.com/macros/s/AKfycbw7Mk6uFVOx_mgRSVO-wfLqy2zFqxQ9c-lNHBBlYA4aCgqQ9AR0YaaZmhaiYTE2d0r7/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwrkU7A1rof1j2TrUXrpscs7WsBq-1qZJyV0CLP9T6k_TP-gu-IUo1PPW9EC3sef4B8/exec';
 
 const STATUS_COLORS = {
   '등록됨': { bg: 'var(--neutral-bg)', text: 'var(--neutral-text)' },
   '진행중': { bg: 'var(--info-bg)', text: 'var(--info-text)' },
   '완료확인대기': { bg: 'var(--accent-bg)', text: 'var(--accent-text)' },
   '완료': { bg: 'var(--good-bg)', text: 'var(--good-text)' },
+  '취소됨': { bg: 'var(--danger-bg)', text: 'var(--danger-text)' },
 };
 
 let pinValue = '';
@@ -296,7 +320,7 @@ function renderList() {
     const c = STATUS_COLORS[issue.상태] || STATUS_COLORS['진행중'];
     const thumb = firstPhoto(issue.요청사진);
     return `
-      <div class="work-item" onclick="openDetail('${escapeAttr(issue.issue_id)}')">
+      <div class="work-item${issue.상태 === '취소됨' ? ' cancelled' : ''}" onclick="openDetail('${escapeAttr(issue.issue_id)}')">
         <div class="thumb">${thumb ? photoImgHtml(thumb, true) : ''}</div>
         <div class="info">
           <div class="ho">${unitLabel(issue)}</div>
@@ -340,7 +364,10 @@ function openDetail(issueId) {
     <div id="c_planHost"></div>
   `;
 
-  if (issue.상태 === '완료확인대기') {
+  if (issue.상태 === '취소됨') {
+    html += `<div class="status-note" style="background:var(--danger-bg); color:var(--danger-text);">
+      <b>이 작업은 취소되었습니다.</b> 진행하지 마세요.<br>사유: ${escapeHtml(issue.취소사유 || '-')}</div>`;
+  } else if (issue.상태 === '완료확인대기') {
     html += `<div class="status-note">완료 보고를 제출했고, 관리팀 확인을 기다리는 중입니다.</div>`;
   } else if (issue.상태 === '완료') {
     html += `<div class="status-note good">완료 승인되었습니다. 확인해주셔서 감사합니다.</div>`;
@@ -357,7 +384,7 @@ function openDetail(issueId) {
         <div class="photo-preview" id="reportPreview"></div>
       </div>
       <div class="field"><label>작업 메모</label><textarea id="r_memo" placeholder="어떻게 처리했는지 남겨주세요"></textarea></div>
-      <button class="btn-primary" onclick="submitReport('${escapeAttr(issue.issue_id)}')">완료 보고 제출</button>
+      <button class="btn-primary" id="r_submit" onclick="submitReport('${escapeAttr(issue.issue_id)}')">완료 보고 제출</button>
     `;
   }
 
@@ -368,12 +395,12 @@ function openDetail(issueId) {
   // 관리팀이 도면에 찍어준 위치를 그대로 보여줍니다 (수정은 불가)
   const planHost = document.getElementById('c_planHost');
   const saved = parseLoc(issue.위치);
-  if (saved && saved.pts.length) {
+  if (saved && saved.shapes.length) {
     planHost.innerHTML = '<div class="detail-row" style="margin-top:10px;"><b>작업 위치</b></div>' +
       '<div id="c_planInner"></div>' +
-      '<div class="plan-hint">빨간 표시가 관리팀이 지정한 지점입니다 (' + saved.pts.length + '곳).</div>';
+      '<div class="plan-hint">빨간 표시가 관리팀이 지정한 지점입니다 (' + saved.shapes.length + '곳).</div>';
     renderPlan(document.getElementById('c_planInner'),
-      { type: saved.type, variant: saved.variant, pts: saved.pts }, false);
+      { type: saved.type, variant: saved.variant, shapes: saved.shapes }, false);
   } else {
     planHost.innerHTML = '';
   }
@@ -429,13 +456,23 @@ function submitReport(issueId) {
     업체메모: document.getElementById('r_memo').value.trim(),
     photos: pendingReportPhotos
   };
+  const btn = document.getElementById('r_submit');
+  if (btn) {
+    if (btn.dataset.busy === '1') return;    // 연타 방지
+    btn.dataset.busy = '1'; btn.disabled = true; btn.textContent = '제출 중...';
+  }
+  const done = () => {
+    if (!btn) return;
+    btn.dataset.busy = ''; btn.disabled = false; btn.textContent = '완료 보고 제출';
+  };
   toast('제출 중...');
   apiPost('reportCompletion', body).then(res => {
-    if (!res.ok) { toast(res.error || '제출 실패'); return; }
+    if (!res.ok) { toast(res.error || '제출 실패'); done(); return; }
     toast('완료 보고를 제출했습니다.');
     closeModal();
     loadMine();
-  }).catch(() => toast('API 연결에 실패했습니다.'));
+    done();
+  }).catch(() => { toast('접속에 실패했습니다. 잠시 후 다시 시도해주세요.'); done(); });
 }
 
 /* =======================================================================
@@ -485,42 +522,89 @@ function parseLoc(s) {
   if (!s) return null;
   var p = String(s).split('|');
   if (p.length < 3) return null;
-  var pts = [];
-  p[2].split(';').forEach(function (seg) {
+  var body = p[2] || '';
+  var shapes = [];
+  // "R:x,y,w,h;..." 는 영역, 그냥 "x,y;..." 는 예전 방식(핀)입니다.
+  var isRegion = body.indexOf('R:') === 0;
+  if (isRegion) body = body.slice(2);
+  body.split(';').forEach(function (seg) {
     if (!seg) return;
-    var xy = seg.split(',');
-    var x = parseFloat(xy[0]), y = parseFloat(xy[1]);
-    if (isFinite(x) && isFinite(y)) pts.push({ x: x, y: y });
+    var v = seg.split(',').map(parseFloat);
+    if (isRegion) {
+      if (v.length >= 4 && v.every(isFinite)) {
+        shapes.push({ t: 'r', x: v[0], y: v[1], w: v[2], h: v[3] });
+      }
+    } else if (v.length >= 2 && isFinite(v[0]) && isFinite(v[1])) {
+      shapes.push({ t: 'p', x: v[0], y: v[1] });
+    }
   });
-  return { type: p[0], variant: p[1] || '기본형', pts: pts };
+  return { type: p[0], variant: p[1] || '기본형', shapes: shapes };
 }
 
-function buildLoc(type, variant, pts) {
-  if (!type || !pts || !pts.length) return '';
-  return type + '|' + variant + '|' + pts.map(function (p) {
-    return p.x.toFixed(3) + ',' + p.y.toFixed(3);
+function buildLoc(type, variant, shapes) {
+  if (!type || !shapes || !shapes.length) return '';
+  var f = function (v) { return v.toFixed(3); };
+  // 하나라도 영역이 있으면 영역 형식으로 저장합니다 (핀은 아주 작은 영역으로 변환)
+  var anyRegion = shapes.some(function (s) { return s.t === 'r'; });
+  if (!anyRegion) {
+    return type + '|' + variant + '|' +
+      shapes.map(function (s) { return f(s.x) + ',' + f(s.y); }).join(';');
+  }
+  return type + '|' + variant + '|R:' + shapes.map(function (s) {
+    if (s.t === 'r') return [s.x, s.y, s.w, s.h].map(f).join(',');
+    return [Math.max(0, s.x - 0.02), Math.max(0, s.y - 0.02), 0.04, 0.04].map(f).join(',');
   }).join(';');
 }
 
-function pinsHtml(pts) {
-  return pts.map(function (p, i) {
-    return '<div class="plan-pin" style="left:' + (p.x * 100) + '%; top:' + (p.y * 100) + '%;">' +
+function shapesHtml(shapes) {
+  return shapes.map(function (s, i) {
+    if (s.t === 'r') {
+      return '<div class="plan-rgn" style="left:' + (s.x * 100) + '%; top:' + (s.y * 100) +
+             '%; width:' + (s.w * 100) + '%; height:' + (s.h * 100) + '%;">' +
+             '<span class="r-num">' + (i + 1) + '</span></div>';
+    }
+    return '<div class="plan-pin" style="left:' + (s.x * 100) + '%; top:' + (s.y * 100) + '%;">' +
            '<div class="p-dot"></div><div class="p-num">' + (i + 1) + '</div></div>';
   }).join('');
+}
+
+/* ---- 도면 크게 보기 ---- */
+function ensurePlanZoom() {
+  if (document.getElementById('planZoom')) return;
+  var z = document.createElement('div');
+  z.id = 'planZoom';
+  z.className = 'plan-zoom';
+  z.innerHTML = '<button type="button" class="plan-zoom-close" aria-label="닫기">✕</button>' +
+                '<div class="plan-zoom-inner"><div class="plan-zoom-stage"></div></div>';
+  document.body.appendChild(z);
+  z.querySelector('.plan-zoom-close').addEventListener('click', function () { z.classList.remove('open'); });
+  z.addEventListener('click', function (e) { if (e.target === z) z.classList.remove('open'); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') z.classList.remove('open');
+  });
+}
+
+function openPlanZoom(src, shapes) {
+  ensurePlanZoom();
+  var z = document.getElementById('planZoom');
+  z.querySelector('.plan-zoom-stage').innerHTML =
+    '<img src="' + escapeAttr(src) + '" alt="평면도 크게 보기">' + shapesHtml(shapes);
+  z.classList.add('open');
 }
 
 /**
  * 평면도를 그립니다.
  *  host     : 그려 넣을 요소
- *  state    : { type, variant, pts }  — pickable이면 이 객체를 직접 고칩니다
- *  pickable : true면 눌러서 핀을 찍을 수 있음
- *  onChange : 핀이 바뀔 때 호출
+ *  state    : { type, variant, shapes }
+ *  pickable : true면 드래그해서 영역을 표시할 수 있음
  */
 function renderPlan(host, state, pickable, onChange) {
   if (!host) return;
+  if (!state.shapes) state.shapes = [];
   if (!state || !state.type) {
     host.innerHTML = '<div class="plan-box"><div class="plan-none">' +
-      '도면을 찾을 수 없는 호수입니다.<br>동·호수를 정확히 고르면 평면도가 나타납니다.</div></div>';
+      '동·호수를 입력하면 그 세대의 평면도가 나타납니다.<br>' +
+      '골조·공용부처럼 도면이 없는 곳은 비워두고 사진으로만 지시하셔도 됩니다.</div></div>';
     return;
   }
   host.innerHTML = '<div class="plan-box"><div class="plan-none">평면도 불러오는 중…</div></div>';
@@ -541,41 +625,98 @@ function renderPlan(host, state, pickable, onChange) {
         '</div></div>';
       return;
     }
-    var html = '<div class="plan-box' + (pickable ? ' pickable' : '') + '" data-plan="1">' +
-               '<img src="' + escapeAttr(src) + '" alt="평면도">' + pinsHtml(state.pts) + '</div>';
+    var html = '<div class="plan-box' + (pickable ? ' pickable' : '') + '">' +
+               '<img src="' + escapeAttr(src) + '" alt="평면도">' + shapesHtml(state.shapes) +
+               '<button type="button" class="plan-zoom-btn" data-plan-zoom="1">🔍 크게</button>' +
+               '</div>';
     if (pickable) {
       html += '<div class="plan-tools">' +
               '<button type="button" class="vbtn ghost" data-plan-undo="1">되돌리기</button>' +
               '<button type="button" class="vbtn ghost" data-plan-clear="1">모두 지우기</button>' +
               '</div>' +
-              '<div class="plan-hint">도면에서 문제가 있는 지점을 눌러주세요. 여러 곳을 찍어도 됩니다. ' +
-              '현재 <b>' + state.pts.length + '곳</b> 표시됨.' +
+              '<div class="plan-hint">문제가 있는 <b>범위를 드래그</b>해서 네모로 표시해주세요. ' +
+              '짧게 톡 누르면 점으로도 찍힙니다. 현재 <b>' + state.shapes.length + '곳</b>.' +
               (state.variant !== '확장형'
                 ? '<br>이 타입은 확장형 도면이 없어 <b>기본형</b>으로 표시했습니다.' : '') +
               '</div>';
+    } else {
+      html += '<div class="plan-hint">🔍 크게 를 누르면 도면을 확대해서 볼 수 있습니다.</div>';
     }
     host.innerHTML = html;
 
-    if (!pickable) return;
     var box = host.querySelector('.plan-box');
-    box.addEventListener('click', function (e) {
+    var zoomBtn = host.querySelector('[data-plan-zoom]');
+    if (zoomBtn) zoomBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      openPlanZoom(src, state.shapes);
+    });
+    if (!pickable) return;
+
+    // ---- 드래그로 영역 표시 ----
+    var drag = null;
+    function rel(ev) {
       var r = box.getBoundingClientRect();
-      var x = (e.clientX - r.left) / r.width;
-      var y = (e.clientY - r.top) / r.height;
-      if (x < 0 || x > 1 || y < 0 || y > 1) return;
-      state.pts.push({ x: x, y: y });
+      var t = (ev.touches && ev.touches.length) ? ev.touches[0]
+            : (ev.changedTouches && ev.changedTouches.length) ? ev.changedTouches[0] : ev;
+      if (typeof t.clientX !== 'number') return null;
+      return { x: Math.min(1, Math.max(0, (t.clientX - r.left) / r.width)),
+               y: Math.min(1, Math.max(0, (t.clientY - r.top) / r.height)) };
+    }
+    function preview(b) {
+      var old = box.querySelector('.plan-rgn.preview');
+      if (old) old.remove();
+      if (!b) return;
+      var el = document.createElement('div');
+      el.className = 'plan-rgn preview';
+      el.style.left = (b.x * 100) + '%'; el.style.top = (b.y * 100) + '%';
+      el.style.width = (b.w * 100) + '%'; el.style.height = (b.h * 100) + '%';
+      box.appendChild(el);
+    }
+    function boxOf(x1, y1, x2, y2) {
+      return { t: 'r', x: Math.min(x1, x2), y: Math.min(y1, y2),
+               w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) };
+    }
+    function onDown(ev) {
+      if (ev.target.closest('[data-plan-zoom]')) return;
+      var p = rel(ev); if (!p) return;
+      drag = { sx: p.x, sy: p.y };
+      if (ev.cancelable) ev.preventDefault();
+    }
+    function onMove(ev) {
+      if (!drag) return;
+      var p = rel(ev); if (!p) return;
+      preview(boxOf(drag.sx, drag.sy, p.x, p.y));
+      if (ev.cancelable) ev.preventDefault();
+    }
+    function onUp(ev) {
+      if (!drag) return;
+      var p = rel(ev);
+      var b = p ? boxOf(drag.sx, drag.sy, p.x, p.y) : null;
+      drag = null;
+      preview(null);
+      if (!b) return;
+      // 거의 안 움직였으면 "점 찍기"로 처리
+      if (b.w < 0.025 || b.h < 0.025) state.shapes.push({ t: 'p', x: b.x + b.w / 2, y: b.y + b.h / 2 });
+      else state.shapes.push(b);
       renderPlan(host, state, true, onChange);
       if (onChange) onChange(state);
-    });
+    }
+    box.addEventListener('mousedown', onDown);
+    box.addEventListener('touchstart', onDown, { passive: false });
+    window.addEventListener('mousemove', onMove);
+    box.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('mouseup', onUp);
+    box.addEventListener('touchend', onUp);
+
     var undo = host.querySelector('[data-plan-undo]');
     if (undo) undo.addEventListener('click', function () {
-      state.pts.pop();
+      state.shapes.pop();
       renderPlan(host, state, true, onChange);
       if (onChange) onChange(state);
     });
     var clr = host.querySelector('[data-plan-clear]');
     if (clr) clr.addEventListener('click', function () {
-      state.pts = [];
+      state.shapes = [];
       renderPlan(host, state, true, onChange);
       if (onChange) onChange(state);
     });
