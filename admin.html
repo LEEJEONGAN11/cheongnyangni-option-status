@@ -113,6 +113,26 @@
   }
   .photo-failed a { color: var(--info-text); }
   .photo-failed.sm { width:100%; height:100%; font-size:10px; gap:0; padding:2px; background:transparent; }
+
+  /* ---- 도면 위치 표시 ---- */
+  .plan-box { position:relative; border:1px solid var(--gridline); border-radius:10px;
+              overflow:hidden; background:var(--page-plane); }
+  .plan-box img { display:block; width:100%; }
+  .plan-box.pickable { cursor:crosshair; touch-action:manipulation; }
+  .plan-pin { position:absolute; width:24px; height:24px; margin-left:-12px; margin-top:-24px; pointer-events:none; }
+  .plan-pin .p-dot { width:24px; height:24px; border-radius:50% 50% 50% 0; transform:rotate(-45deg);
+                     background:var(--danger); border:2px solid #fff; box-shadow:0 2px 5px rgba(0,0,0,.35); }
+  .plan-pin .p-num { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+                     color:#fff; font-size:11px; font-weight:800; }
+  .plan-none { padding:22px 14px; text-align:center; font-size:12px; color:var(--text-muted); line-height:1.7; }
+  .plan-tools { display:flex; gap:6px; align-items:center; margin-top:8px; flex-wrap:wrap; }
+  .plan-tools .vbtn { padding:6px 12px; border-radius:999px; border:1px solid var(--border);
+                      background:var(--surface-2); font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; }
+  .plan-tools .vbtn[aria-pressed="true"] { background:var(--text-primary); color:#fff; border-color:var(--text-primary); }
+  .plan-tools .vbtn.ghost { color:var(--danger-text); }
+  .plan-hint { font-size:11.5px; color:var(--text-muted); margin-top:6px; line-height:1.65; }
+  .plan-badge { font-size:11px; font-weight:800; color:var(--brand-text);
+                background:var(--brand-bg); padding:3px 8px; border-radius:999px; margin-left:6px; }
   .detail-row { font-size: 12.5px; margin-bottom: 8px; }
   .detail-row b { color: var(--text-secondary); }
 
@@ -187,8 +207,20 @@
     <button class="close-x" onclick="closeModal('createOverlay')">✕</button>
     <h2>새 이슈 등록</h2>
     <div class="field-row">
-      <div class="field"><label>동</label><input id="c_dong" placeholder="예: 102동"></div>
-      <div class="field"><label>호수</label><input id="c_ho" placeholder="예: 1902호"></div>
+      <div class="field">
+        <label>동</label>
+        <input id="c_dong" list="dongList" placeholder="예: 102" autocomplete="off">
+        <datalist id="dongList"></datalist>
+      </div>
+      <div class="field">
+        <label>호수 <span id="c_typeBadge"></span></label>
+        <input id="c_ho" list="hoList" placeholder="예: 1902" autocomplete="off">
+        <datalist id="hoList"></datalist>
+      </div>
+    </div>
+    <div class="field" id="c_planField">
+      <label>도면에서 위치 표시 <span style="font-weight:500; color:var(--text-muted);">(선택)</span></label>
+      <div id="c_planHost"></div>
     </div>
     <div class="field">
       <label>카테고리 (골라도 되고, 없으면 직접 입력하세요)</label>
@@ -495,16 +527,61 @@ function firstPhoto(csv) {
 }
 
 /* ---------- create issue ---------- */
+/* 동 목록 채우기 + 동이 바뀌면 호수 목록 갱신 + 타입 판별해서 평면도 표시 */
+let createLoc = { type: '', variant: PLAN_DEFAULT_VARIANT, pts: [] };
+
+function initUnitPickers() {
+  document.getElementById('dongList').innerHTML =
+    Object.keys(UNIT_TYPES).sort().map(d => `<option value="${d}">`).join('');
+  const dong = document.getElementById('c_dong');
+  const ho = document.getElementById('c_ho');
+  dong.addEventListener('input', () => { refreshHoList(); updateCreatePlan(); });
+  ho.addEventListener('input', updateCreatePlan);
+  refreshHoList();
+}
+
+function refreshHoList() {
+  const d = UNIT_TYPES[normDong(document.getElementById('c_dong').value)] || {};
+  document.getElementById('hoList').innerHTML = Object.keys(d)
+    .sort((a, b) => Number(a) - Number(b))
+    .map(h => `<option value="${h}">${d[h].t}</option>`).join('');
+}
+
+function updateCreatePlan() {
+  const dong = document.getElementById('c_dong').value;
+  const ho = document.getElementById('c_ho').value;
+  const info = lookupUnit(dong, ho);
+  const badge = document.getElementById('c_typeBadge');
+  const host = document.getElementById('c_planHost');
+
+  if (!info) {
+    badge.innerHTML = '';
+    createLoc = { type: '', variant: PLAN_DEFAULT_VARIANT, pts: [] };
+    host.innerHTML = '<div class="plan-box"><div class="plan-none">' +
+      '동·호수를 입력하면 그 세대의 평면도가 나타납니다.<br>' +
+      '골조·공용부처럼 도면이 없는 곳은 비워두고 사진으로만 지시하셔도 됩니다.</div></div>';
+    return;
+  }
+  badge.innerHTML = '<span class="plan-badge">' + escapeHtml(info.t) + '</span>';
+  // 타입이 바뀌었을 때만 초기화 (같은 세대면 찍어둔 핀 유지)
+  if (createLoc.type !== info.t) {
+    createLoc = { type: info.t, variant: PLAN_DEFAULT_VARIANT, pts: [] };
+  }
+  renderPlan(host, createLoc, true);
+}
+
 function openCreateModal() {
   document.getElementById('c_dong').value = '';
   document.getElementById('c_ho').value = '';
   document.getElementById('c_cat').value = '';
+  createLoc = { type: '', variant: PLAN_DEFAULT_VARIANT, pts: [] };
   document.getElementById('c_desc').value = '';
   document.getElementById('c_instruction').value = '';
   document.getElementById('c_due').value = '';
   document.getElementById('c_company').value = '';
   pendingPhotos.createPreview = [];
   document.getElementById('createPreview').innerHTML = '';
+  updateCreatePlan();
   document.getElementById('createOverlay').classList.add('active');
 }
 
@@ -572,6 +649,7 @@ function submitCreate() {
     담당업체: companyName,
     담당업체연락처: companyContact,
     지시사항: document.getElementById('c_instruction').value.trim(),
+    위치: buildLoc(createLoc.type, createLoc.variant, createLoc.pts),
     photos: pendingPhotos.createPreview
   };
 
@@ -586,6 +664,7 @@ function submitCreate() {
 
 /* ---------- issue detail ---------- */
 let detailPhotos = { reject: [] };
+let detailLoc = { type: '', variant: PLAN_DEFAULT_VARIANT, pts: [] };
 
 function openDetail(issueId) {
   const issue = allIssues.find(i => i.issue_id === issueId);
@@ -602,6 +681,7 @@ function openDetail(issueId) {
     <div class="detail-row"><b>상태:</b> ${escapeHtml(issue.상태)}</div>
     <div class="detail-row"><b>카테고리:</b> ${escapeHtml(issue.카테고리 || '-')} · <b>우선순위:</b> ${escapeHtml(issue.우선순위 || '-')}</div>
     <div class="detail-row"><b>문제설명:</b> ${escapeHtml(issue.문제설명 || '-')}</div>
+    <div id="d_planHost"></div>
     <div class="compare-photos">
       ${photoBoxHtml(reqPhotos, '요청 사진')}
     </div>
@@ -661,6 +741,29 @@ function openDetail(issueId) {
   const body = document.getElementById('d_body');
   body.innerHTML = html;
   wirePhotoFallbacks(body);
+
+  // 도면 위치: 이미 찍혀 있으면 보여주고, 아직 없으면 여기서 찍을 수 있게 합니다.
+  const planHost = document.getElementById('d_planHost');
+  const saved = parseLoc(issue.위치);
+  const info = lookupUnit(issue.동, issue.호수);
+  if (saved && saved.pts.length) {
+    detailLoc = { type: saved.type, variant: saved.variant, pts: saved.pts.slice() };
+    planHost.innerHTML = '<div class="detail-row" style="margin-top:10px;"><b>도면 위치</b> ' +
+      '<span class="plan-badge">' + escapeHtml(saved.type) + ' · ' + escapeHtml(saved.variant) + '</span></div>' +
+      '<div id="d_planInner"></div>';
+    renderPlan(document.getElementById('d_planInner'), detailLoc, false);
+  } else if (info && !issue.담당업체) {
+    // 아직 배정 전이면 이 자리에서 위치를 지정할 수 있게
+    detailLoc = { type: info.t, variant: PLAN_DEFAULT_VARIANT, pts: [] };
+    planHost.innerHTML = '<div class="detail-row" style="margin-top:10px;"><b>도면 위치</b> ' +
+      '<span style="color:var(--text-muted);">아직 표시 안 됨 — 아래에서 찍으면 배정할 때 같이 저장됩니다</span></div>' +
+      '<div id="d_planInner"></div>';
+    renderPlan(document.getElementById('d_planInner'), detailLoc, true);
+  } else {
+    detailLoc = { type: '', variant: PLAN_DEFAULT_VARIANT, pts: [] };
+    planHost.innerHTML = '';
+  }
+
   document.getElementById('detailOverlay').classList.add('active');
 }
 
@@ -683,7 +786,8 @@ function submitAssign(issueId) {
     담당업체연락처: companyContact,
     우선순위: document.getElementById('assign_priority').value,
     희망완료일: document.getElementById('assign_due').value,
-    지시사항: document.getElementById('assign_instruction').value.trim()
+    지시사항: document.getElementById('assign_instruction').value.trim(),
+    위치: buildLoc(detailLoc.type, detailLoc.variant, detailLoc.pts)
   };
   toast('배정 중...');
   apiPost('assignIssue', body).then(res => {
@@ -705,6 +809,150 @@ function submitConfirm(issueId, approve) {
     closeModal('detailOverlay');
     loadAll();
   }).catch(() => toast('API 연결에 실패했습니다.'));
+}
+
+/* =======================================================================
+   도면 위치 표시
+   - 평면도 이미지는 옵션 현황 대시보드와 같은 저장소의 images/ 폴더를 씁니다.
+     (구글 서버를 안 거치므로 빠릅니다)
+   - 위치는 "타입|기본형또는확장형|x,y;x,y" 형태의 짧은 글자로 저장합니다.
+     좌표는 이미지 크기와 무관한 비율(0~1)이라 휴대폰에서 찍고 PC에서 봐도 같은 자리입니다.
+   ======================================================================= */
+var UNIT_TYPES = {"101":{"201":{"t":"59C","x":1},"202":{"t":"52A","x":1},"203":{"t":"55A","x":1},"204":{"t":"59A","x":1},"205":{"t":"59A","x":1},"301":{"t":"59C","x":1},"302":{"t":"52A","x":1},"303":{"t":"55A","x":1},"304":{"t":"59A","x":1},"305":{"t":"59A","x":1},"401":{"t":"59C","x":1},"402":{"t":"52A","x":0},"403":{"t":"55A","x":1},"404":{"t":"59A","x":1},"405":{"t":"59A","x":1},"501":{"t":"59C","x":1},"502":{"t":"52A","x":0},"503":{"t":"55A","x":1},"504":{"t":"59A","x":1},"505":{"t":"59A","x":1},"601":{"t":"59C","x":1},"602":{"t":"52A","x":0},"603":{"t":"55A","x":1},"604":{"t":"59A","x":1},"605":{"t":"59A","x":1},"701":{"t":"59C","x":1},"702":{"t":"52A","x":0},"703":{"t":"55A","x":1},"704":{"t":"59A","x":1},"705":{"t":"59A","x":1},"801":{"t":"59C","x":1},"802":{"t":"52A","x":0},"803":{"t":"55A","x":1},"804":{"t":"59A","x":1},"805":{"t":"59A","x":1},"901":{"t":"59C","x":1},"902":{"t":"52A","x":0},"903":{"t":"55A","x":1},"904":{"t":"59A","x":1},"905":{"t":"59A","x":1},"1001":{"t":"59C","x":1},"1002":{"t":"52A","x":0},"1003":{"t":"55A","x":1},"1004":{"t":"59A","x":1},"1005":{"t":"59A","x":1},"1101":{"t":"59C","x":1},"1102":{"t":"52A","x":1},"1103":{"t":"55A","x":1},"1104":{"t":"59A","x":1},"1105":{"t":"59A","x":1},"1201":{"t":"59D","x":1},"1202":{"t":"52A","x":1},"1203":{"t":"55A","x":1},"1204":{"t":"59A","x":1},"1205":{"t":"59A","x":1},"1301":{"t":"59D","x":1},"1302":{"t":"52A","x":0},"1303":{"t":"55A","x":1},"1304":{"t":"59A","x":1},"1305":{"t":"59A","x":1},"1401":{"t":"59D","x":1},"1402":{"t":"52A","x":0},"1403":{"t":"55A","x":1},"1404":{"t":"59A","x":1},"1405":{"t":"59A","x":1},"1501":{"t":"59D","x":1},"1502":{"t":"43","x":1},"1503":{"t":"55A","x":1},"1504":{"t":"59A","x":1},"1505":{"t":"59A","x":1},"1601":{"t":"48B","x":1},"1603":{"t":"59F","x":1},"1604":{"t":"59A","x":1},"1605":{"t":"48A","x":1}},"102":{"201":{"t":"68","x":0},"202":{"t":"79","x":0},"203":{"t":"84","x":0},"204":{"t":"65A","x":0},"205":{"t":"65B","x":0},"301":{"t":"68","x":0},"302":{"t":"79","x":0},"303":{"t":"84","x":0},"304":{"t":"65A","x":0},"305":{"t":"65B","x":0},"401":{"t":"68","x":0},"402":{"t":"79","x":0},"403":{"t":"84","x":0},"404":{"t":"65A","x":0},"405":{"t":"65B","x":0},"501":{"t":"68","x":0},"502":{"t":"79","x":0},"503":{"t":"84","x":0},"504":{"t":"65A","x":0},"505":{"t":"65B","x":0},"601":{"t":"68","x":0},"602":{"t":"79","x":0},"603":{"t":"84","x":0},"604":{"t":"65A","x":0},"605":{"t":"65B","x":0},"701":{"t":"55B","x":1},"702":{"t":"59B","x":1},"703":{"t":"59E","x":1},"704":{"t":"52B","x":1},"705":{"t":"52C","x":0},"801":{"t":"55B","x":1},"802":{"t":"59B","x":1},"803":{"t":"59E","x":1},"804":{"t":"52B","x":1},"805":{"t":"52C","x":0},"901":{"t":"55B","x":1},"902":{"t":"59B","x":1},"903":{"t":"59E","x":1},"904":{"t":"52B","x":1},"905":{"t":"52C","x":0},"1001":{"t":"55B","x":1},"1002":{"t":"59B","x":1},"1003":{"t":"59E","x":1},"1004":{"t":"52B","x":1},"1005":{"t":"52C","x":1},"1101":{"t":"55B","x":1},"1102":{"t":"59B","x":1},"1103":{"t":"59E","x":1},"1104":{"t":"52B","x":1},"1105":{"t":"52C","x":0},"1201":{"t":"55B","x":1},"1202":{"t":"59B","x":1},"1203":{"t":"59E","x":1},"1204":{"t":"52B","x":1},"1205":{"t":"52C","x":0},"1301":{"t":"55B","x":1},"1302":{"t":"59B","x":1},"1303":{"t":"59E","x":1},"1401":{"t":"55B","x":1},"1402":{"t":"59B","x":1},"1403":{"t":"59E","x":1},"1404":{"t":"52B","x":1},"1501":{"t":"55B","x":1},"1502":{"t":"59B","x":1},"1503":{"t":"59E","x":1},"1504":{"t":"52B","x":1},"1601":{"t":"55B","x":1},"1602":{"t":"59B","x":1},"1603":{"t":"59E","x":1},"1604":{"t":"52B","x":1},"1701":{"t":"55B","x":1},"1702":{"t":"59B","x":1},"1703":{"t":"59E","x":1},"1704":{"t":"52B","x":1},"1801":{"t":"55B","x":1},"1802":{"t":"59B","x":1},"1803":{"t":"59E","x":1},"1804":{"t":"52B","x":1},"1901":{"t":"55B","x":1},"1902":{"t":"59B","x":1},"1903":{"t":"59E","x":1}}};
+
+var PLAN_DIR = 'images/';                      // 평면도 폴더가 다르면 이 줄만 바꾸세요
+var PLAN_EXTS = ['jpg', 'jpeg', 'png', 'webp'];
+var PLAN_DEFAULT_VARIANT = '확장형';   // 도면은 확장형 기준
+var planSrcCache = {};
+
+function normDong(v) { return String(v == null ? '' : v).replace(/동\s*$/, '').trim(); }
+function normHo(v)   { return String(v == null ? '' : v).replace(/호\s*$/, '').trim(); }
+
+/** 동/호수로 타입을 찾습니다. 못 찾으면 null */
+function lookupUnit(dong, ho) {
+  var d = UNIT_TYPES[normDong(dong)];
+  if (!d) return null;
+  return d[normHo(ho)] || null;
+}
+
+/** 해당 타입/변형의 평면도 파일이 실제로 있는지 확장자를 바꿔가며 확인 */
+function planProbe(type, variant) {
+  var key = type + '|' + variant;
+  if (Object.prototype.hasOwnProperty.call(planSrcCache, key)) {
+    return Promise.resolve(planSrcCache[key]);
+  }
+  return new Promise(function (resolve) {
+    var i = 0;
+    (function next() {
+      if (i >= PLAN_EXTS.length) { planSrcCache[key] = null; resolve(null); return; }
+      var src = PLAN_DIR + encodeURIComponent(type + '_' + variant) + '.' + PLAN_EXTS[i++];
+      var img = new Image();
+      img.onload = function () { planSrcCache[key] = src; resolve(src); };
+      img.onerror = next;
+      img.src = src;
+    })();
+  });
+}
+
+function parseLoc(s) {
+  if (!s) return null;
+  var p = String(s).split('|');
+  if (p.length < 3) return null;
+  var pts = [];
+  p[2].split(';').forEach(function (seg) {
+    if (!seg) return;
+    var xy = seg.split(',');
+    var x = parseFloat(xy[0]), y = parseFloat(xy[1]);
+    if (isFinite(x) && isFinite(y)) pts.push({ x: x, y: y });
+  });
+  return { type: p[0], variant: p[1] || '기본형', pts: pts };
+}
+
+function buildLoc(type, variant, pts) {
+  if (!type || !pts || !pts.length) return '';
+  return type + '|' + variant + '|' + pts.map(function (p) {
+    return p.x.toFixed(3) + ',' + p.y.toFixed(3);
+  }).join(';');
+}
+
+function pinsHtml(pts) {
+  return pts.map(function (p, i) {
+    return '<div class="plan-pin" style="left:' + (p.x * 100) + '%; top:' + (p.y * 100) + '%;">' +
+           '<div class="p-dot"></div><div class="p-num">' + (i + 1) + '</div></div>';
+  }).join('');
+}
+
+/**
+ * 평면도를 그립니다.
+ *  host     : 그려 넣을 요소
+ *  state    : { type, variant, pts }  — pickable이면 이 객체를 직접 고칩니다
+ *  pickable : true면 눌러서 핀을 찍을 수 있음
+ *  onChange : 핀이 바뀔 때 호출
+ */
+function renderPlan(host, state, pickable, onChange) {
+  if (!host) return;
+  if (!state || !state.type) {
+    host.innerHTML = '<div class="plan-box"><div class="plan-none">' +
+      '도면을 찾을 수 없는 호수입니다.<br>동·호수를 정확히 고르면 평면도가 나타납니다.</div></div>';
+    return;
+  }
+  host.innerHTML = '<div class="plan-box"><div class="plan-none">평면도 불러오는 중…</div></div>';
+
+  // 도면은 확장형 기준으로 보여줍니다.
+  // 오피스텔처럼 확장형 도면이 없는 타입은 자동으로 기본형으로 대체합니다.
+  planProbe(state.type, state.variant).then(function (src) {
+    if (!src && state.variant !== '기본형') {
+      state.variant = '기본형';
+      return planProbe(state.type, '기본형');
+    }
+    return src;
+  }).then(function (src) {
+    if (!src) {
+      host.innerHTML = '<div class="plan-box"><div class="plan-none">' +
+        '<b>' + escapeHtml(state.type) + '</b> 타입 평면도가 아직 없습니다.<br>' +
+        'images 폴더에 <b>' + escapeHtml(state.type) + '_기본형.jpg</b> 로 올리면 바로 표시됩니다.' +
+        '</div></div>';
+      return;
+    }
+    var html = '<div class="plan-box' + (pickable ? ' pickable' : '') + '" data-plan="1">' +
+               '<img src="' + escapeAttr(src) + '" alt="평면도">' + pinsHtml(state.pts) + '</div>';
+    if (pickable) {
+      html += '<div class="plan-tools">' +
+              '<button type="button" class="vbtn ghost" data-plan-undo="1">되돌리기</button>' +
+              '<button type="button" class="vbtn ghost" data-plan-clear="1">모두 지우기</button>' +
+              '</div>' +
+              '<div class="plan-hint">도면에서 문제가 있는 지점을 눌러주세요. 여러 곳을 찍어도 됩니다. ' +
+              '현재 <b>' + state.pts.length + '곳</b> 표시됨.' +
+              (state.variant !== '확장형'
+                ? '<br>이 타입은 확장형 도면이 없어 <b>기본형</b>으로 표시했습니다.' : '') +
+              '</div>';
+    }
+    host.innerHTML = html;
+
+    if (!pickable) return;
+    var box = host.querySelector('.plan-box');
+    box.addEventListener('click', function (e) {
+      var r = box.getBoundingClientRect();
+      var x = (e.clientX - r.left) / r.width;
+      var y = (e.clientY - r.top) / r.height;
+      if (x < 0 || x > 1 || y < 0 || y > 1) return;
+      state.pts.push({ x: x, y: y });
+      renderPlan(host, state, true, onChange);
+      if (onChange) onChange(state);
+    });
+    var undo = host.querySelector('[data-plan-undo]');
+    if (undo) undo.addEventListener('click', function () {
+      state.pts.pop();
+      renderPlan(host, state, true, onChange);
+      if (onChange) onChange(state);
+    });
+    var clr = host.querySelector('[data-plan-clear]');
+    if (clr) clr.addEventListener('click', function () {
+      state.pts = [];
+      renderPlan(host, state, true, onChange);
+      if (onChange) onChange(state);
+    });
+  });
 }
 
 /* ---------- 사진 표시 (구글 드라이브 링크 우회 포함) ---------- */
@@ -825,6 +1073,7 @@ function formatDate(v) {
 }
 
 document.getElementById('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+initUnitPickers();
 tryAutoLogin();
 </script>
 </body>
