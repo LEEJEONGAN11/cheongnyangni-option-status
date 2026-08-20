@@ -430,7 +430,10 @@
    주소는 config.js 에만 한 번 넣어두면 됩니다.
    ========================================================= */
 const CFG = window.AS_CONFIG || {};
-const API_URL = CFG.apiUrl || 'https://script.google.com/macros/s/AKfycbzuN-WoJt2IxOSbyfpU5Ag6qJsEe0bdHjVxy1KfND2XT4m0jES0M5V0pp3P76WGyTbB/exec';
+// config.js 에 실제 주소가 들어있을 때만 그걸 쓰고,
+// 아니면 바로 아래 줄에 직접 넣은 주소를 씁니다. (자리표시자는 무시)
+const CFG_URL = (CFG.apiUrl && CFG.apiUrl.indexOf('PASTE_YOUR') < 0) ? CFG.apiUrl : '';
+const API_URL = CFG_URL || 'https://script.google.com/macros/s/AKfycbzuN-WoJt2IxOSbyfpU5Ag6qJsEe0bdHjVxy1KfND2XT4m0jES0M5V0pp3P76WGyTbB/exec';
 // config.js 에 넣어도 되고, 바로 아래 줄을 직접 고쳐도 됩니다. 둘 다 됩니다.
 const API_READY = API_URL.indexOf('PASTE_YOUR') < 0;
 const SCHEMA_EXPECTED = 3;      // 이 화면이 기대하는 서버 버전
