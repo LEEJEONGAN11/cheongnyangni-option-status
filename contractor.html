@@ -66,6 +66,13 @@
   .detail-row b { color: var(--text-secondary); }
   .req-photos { display:flex; gap:8px; overflow-x:auto; margin: 10px 0; }
   .req-photos img { width:100px; height:100px; object-fit:cover; border-radius:8px; border:1px solid var(--gridline); flex-shrink:0; }
+  .photo-failed {
+    width:100px; height:100px; flex-shrink:0; display:flex; flex-direction:column; gap:4px;
+    align-items:center; justify-content:center; text-align:center; padding:6px;
+    font-size:10.5px; color:var(--text-muted); background: var(--page-plane);
+    border:1px solid var(--gridline); border-radius:8px;
+  }
+  .photo-failed a { color: var(--info-text); }
 
   .field { margin-bottom: 12px; }
   .field label { display:block; font-size: 11.5px; color: var(--text-muted); font-weight:700; margin-bottom:5px; }
@@ -270,7 +277,7 @@ function openDetail(issueId) {
   let html = `
     <div class="detail-row"><b>카테고리:</b> ${escapeHtml(issue.카테고리||'-')} · <b>우선순위:</b> ${escapeHtml(issue.우선순위||'-')}</div>
     <div class="detail-row"><b>문제설명:</b> ${escapeHtml(issue.문제설명||'-')}</div>
-    ${reqPhotos.length ? `<div class="req-photos">${reqPhotos.map(u => `<img src="${escapeAttr(u)}">`).join('')}</div>` : ''}
+    ${reqPhotos.length ? `<div class="req-photos">${reqPhotos.map(u => photoImgHtml(u)).join('')}</div>` : ''}
     <div class="detail-row"><b>작업 지시사항:</b> ${escapeHtml(issue.지시사항||'-')}</div>
     <div class="detail-row"><b>희망완료일:</b> ${escapeHtml(issue.희망완료일||'-')}</div>
   `;
@@ -296,7 +303,9 @@ function openDetail(issueId) {
     `;
   }
 
-  document.getElementById('d_body').innerHTML = html;
+  const body = document.getElementById('d_body');
+  body.innerHTML = html;
+  wirePhotoFallbacks(body);
   document.getElementById('detailOverlay').classList.add('active');
 }
 
@@ -355,6 +364,51 @@ function submitReport(issueId) {
     closeModal();
     loadMine();
   }).catch(() => toast('API 연결에 실패했습니다.'));
+}
+
+/* ---------- 사진 표시 (구글 드라이브 링크 우회 포함) ---------- */
+/* 구글 드라이브는 이미지 직접 링크를 자주 막기 때문에, 순서대로 3가지를 시도합니다.
+   1) drive.google.com/thumbnail  2) lh3.googleusercontent.com  3) API가 직접 읽어서 전달 */
+function photoIdFrom(url) {
+  const s = String(url || '');
+  const m = s.match(/[?&]id=([\w-]{10,})/) || s.match(/\/d\/([\w-]{10,})/);
+  return m ? m[1] : '';
+}
+
+function photoImgHtml(url) {
+  const id = photoIdFrom(url);
+  return `<img data-photo-id="${escapeAttr(id)}" src="${escapeAttr(url)}" loading="lazy" alt="사진">`;
+}
+
+function markPhotoFailed(img) {
+  const id = img.dataset.photoId;
+  const box = document.createElement('div');
+  box.className = 'photo-failed';
+  box.innerHTML = '사진을 불러오지 못했어요' +
+    (id ? `<a href="https://drive.google.com/file/d/${encodeURIComponent(id)}/view" target="_blank" rel="noopener">드라이브에서 열기</a>` : '');
+  if (img.parentNode) img.parentNode.replaceChild(box, img);
+}
+
+function wirePhotoFallbacks(root) {
+  root.querySelectorAll('img[data-photo-id]').forEach(img => {
+    if (img.dataset.wired === '1') return;
+    img.dataset.wired = '1';
+    let stage = 0;
+    img.addEventListener('error', () => {
+      const id = img.dataset.photoId;
+      if (!id) { markPhotoFailed(img); return; }
+      stage++;
+      if (stage === 1) {
+        img.src = 'https://lh3.googleusercontent.com/d/' + encodeURIComponent(id) + '=w1600';
+      } else if (stage === 2) {
+        apiGet({ action: 'getPhoto', id, pin: companyPin })
+          .then(res => { if (res && res.ok && res.dataUrl) img.src = res.dataUrl; else markPhotoFailed(img); })
+          .catch(() => markPhotoFailed(img));
+      } else {
+        markPhotoFailed(img);
+      }
+    });
+  });
 }
 
 /* ---------- utils ---------- */
