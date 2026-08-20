@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AS·유지보수 관리 — 청량리역 요진 와이시티</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --surface-2: #ffffff;
+    --page-plane: #f6f6f3;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --gridline: #e1e0d9;
+    --border: rgba(11,11,11,0.10);
+    --good: #0ca30c; --good-bg: #e3f6e3; --good-text: #0a6e0a;
+    --info: #2a78d6; --info-bg: #e3edfb; --info-text: #1c5cab;
+    --neutral-bg: #f0efec; --neutral-text: #6b6a65;
+    --accent: #eda100; --accent-bg: #fdf0d6; --accent-text: #7a5200;
+    --danger: #d6422a; --danger-bg: #fbe6e1; --danger-text: #a3301c;
+    --brand: #6a4fd6; --brand-bg: #ece7fb; --brand-text: #4c35a8;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--page-plane); color: var(--text-primary); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 20px 80px; }
+
+  /* ---- login ---- */
+  #loginScreen { min-height: 100vh; display:flex; align-items:center; justify-content:center; }
+  .login-box { background: var(--surface-2); border:1px solid var(--border); border-radius: 16px; padding: 36px 32px; width: 100%; max-width: 340px; text-align:center; box-shadow: 0 20px 45px rgba(0,0,0,.06); }
+  .login-box h1 { font-size: 17px; margin: 0 0 6px; }
+  .login-box p { font-size: 12.5px; color: var(--text-muted); margin: 0 0 20px; }
+  .login-box input { width:100%; text-align:center; letter-spacing: 6px; font-size: 20px; padding: 12px; border-radius: 10px; border:1px solid var(--border); margin-bottom: 14px; }
+  .login-box button { width:100%; padding: 12px; border-radius: 10px; border:none; background: var(--brand); color:#fff; font-size: 14px; font-weight:800; cursor:pointer; }
+  .login-error { color: var(--danger-text); font-size: 12.5px; margin-top: 10px; min-height: 16px; }
+
+  /* ---- top bar ---- */
+  .topbar { display:flex; align-items:center; justify-content:space-between; margin-bottom: 20px; flex-wrap:wrap; gap:10px; }
+  .topbar h1 { font-size: 19px; margin:0; }
+  .topbar .sub { font-size: 12px; color: var(--text-muted); }
+  .btn { padding: 9px 16px; border-radius: 9px; border:1px solid var(--border); background: var(--surface-2); color: var(--text-primary); font-size: 13px; font-weight:700; cursor:pointer; }
+  .btn.brand { background: var(--brand); color:#fff; border-color: var(--brand); }
+  .btn.ghost { background: transparent; color: var(--text-muted); border-color: transparent; }
+  .topbar-actions { display:flex; gap:8px; }
+
+  .tabs { display:flex; gap:8px; margin-bottom: 18px; }
+  .tab-btn { padding: 8px 16px; border-radius: 999px; border:1px solid var(--border); background: var(--surface-1); color: var(--text-secondary); font-size:13px; font-weight:700; cursor:pointer; }
+  .tab-btn.active { background: var(--text-primary); color:#fff; border-color: var(--text-primary); }
+  .tab-pane { display:none; }
+  .tab-pane.active { display:block; }
+
+  /* ---- filters ---- */
+  .filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 16px; }
+  .chip { padding: 7px 14px; border-radius:999px; font-size:12.5px; border:1px solid var(--border); background: var(--surface-1); color: var(--text-secondary); cursor:pointer; }
+  .chip.active { background: var(--text-primary); color:#fff; border-color: var(--text-primary); }
+  .search-box { flex:1; min-width:160px; }
+  .search-box input { width:100%; padding: 8px 12px; border-radius:999px; border:1px solid var(--border); font-size:12.5px; }
+
+  /* ---- cards ---- */
+  .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+  .issue-card { background: var(--surface-2); border:1px solid var(--border); border-radius: 12px; padding: 14px; cursor:pointer; transition: box-shadow .15s; }
+  .issue-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,.06); }
+  .issue-card .thumb { height: 90px; border-radius: 8px; background: linear-gradient(135deg,#d9d6cd,#c7c3b6); background-size:cover; background-position:center; margin-bottom:10px; display:flex; align-items:center; justify-content:center; color: rgba(0,0,0,.35); font-size:12px; }
+  .issue-card .ho { font-size:13.5px; font-weight:800; margin-bottom:2px; }
+  .issue-card .cat { font-size:11.5px; color: var(--text-muted); margin-bottom:8px; }
+  .badge { display:inline-block; font-size:10.5px; font-weight:800; padding:4px 9px; border-radius:999px; }
+  .empty-state { text-align:center; padding: 60px 20px; color: var(--text-muted); font-size:13.5px; }
+
+  /* ---- modal ---- */
+  .overlay { position:fixed; inset:0; background: rgba(11,11,11,.45); display:none; align-items:flex-start; justify-content:center; padding: 40px 16px; overflow-y:auto; z-index: 100; }
+  .overlay.active { display:flex; }
+  .modal { background: var(--surface-2); border-radius: 16px; width: 100%; max-width: 480px; padding: 24px; margin-top: 10px; }
+  .modal h2 { font-size: 16px; margin: 0 0 16px; }
+  .field { margin-bottom: 13px; }
+  .field label { display:block; font-size: 11.5px; color: var(--text-muted); font-weight:700; margin-bottom:5px; }
+  .field input, .field select, .field textarea {
+    width:100%; padding: 9px 11px; border-radius:8px; border:1px solid var(--border); font-size:13px; font-family:inherit; background: var(--surface-1);
+  }
+  .field textarea { resize: vertical; min-height: 60px; }
+  .field-row { display:flex; gap:10px; }
+  .field-row > .field { flex:1; }
+  .dropzone { border:1.5px dashed var(--border); border-radius:10px; padding:16px; text-align:center; font-size:12px; color:var(--text-muted); cursor:pointer; background: var(--surface-1); }
+  .dropzone input { display:none; }
+  .photo-preview { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .photo-preview img { width: 56px; height:56px; object-fit:cover; border-radius:6px; border:1px solid var(--border); }
+  .modal-actions { display:flex; gap:8px; margin-top: 18px; }
+  .modal-actions button { flex:1; padding:11px; border-radius:9px; font-size:13px; font-weight:800; border:none; cursor:pointer; }
+  .btn-primary { background: var(--brand); color:#fff; }
+  .btn-cancel { background: var(--neutral-bg); color: var(--text-secondary); }
+  .btn-approve { background: var(--good); color:#fff; }
+  .btn-reject { background: var(--danger-bg); color: var(--danger-text); }
+  .close-x { position:absolute; top:16px; right:20px; cursor:pointer; color: var(--text-muted); font-size:18px; background:none; border:none; }
+  .modal { position:relative; }
+
+  .compare-photos { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin: 10px 0 4px; }
+  .photo-box { border-radius:10px; overflow:hidden; border:1px solid var(--gridline); }
+  .photo-box img { width:100%; height:110px; object-fit:cover; display:block; }
+  .photo-box .cap { font-size:10.5px; text-align:center; padding:5px; color: var(--text-muted); background: var(--surface-1); }
+  .photo-box .none { height:110px; display:flex; align-items:center; justify-content:center; font-size:11px; color:var(--text-muted); background: var(--page-plane); }
+  .detail-row { font-size: 12.5px; margin-bottom: 8px; }
+  .detail-row b { color: var(--text-secondary); }
+
+  /* ---- stats ---- */
+  .stats-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 12px; }
+  .stat-card { background: var(--surface-2); border:1px solid var(--border); border-radius:12px; padding: 16px 18px; }
+  .stat-card h3 { font-size: 14px; margin:0 0 12px; }
+  .stat-line { display:flex; justify-content:space-between; font-size:12.5px; color: var(--text-secondary); padding: 4px 0; }
+  .stat-line b { color: var(--text-primary); }
+
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background: var(--text-primary); color:#fff; padding:11px 20px; border-radius:999px; font-size:13px; z-index:200; display:none; }
+  .loading-note { font-size:12.5px; color: var(--text-muted); text-align:center; padding: 30px; }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-box">
+    <h1>AS·유지보수 관리자</h1>
+    <p>청량리역 요진 와이시티 · 관리팀 전용 화면입니다</p>
+    <input id="pinInput" type="password" inputmode="numeric" maxlength="10" placeholder="관리자 PIN">
+    <button onclick="doLogin()">입장하기</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<div class="wrap" id="mainScreen" style="display:none;">
+  <div class="topbar">
+    <div>
+      <h1>AS·유지보수 관리</h1>
+      <div class="sub">청량리역 요진 와이시티 · 관리팀</div>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn" onclick="loadAll()">새로고침</button>
+      <button class="btn brand" onclick="openCreateModal()">＋ 새 이슈 등록</button>
+      <button class="btn ghost" onclick="logout()">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="issues" onclick="switchTab('issues')">이슈 목록</button>
+    <button class="tab-btn" data-tab="stats" onclick="switchTab('stats')">업체별 통계</button>
+  </div>
+
+  <div class="tab-pane active" id="tab-issues">
+    <div class="filters">
+      <span class="chip active" data-status="__all" onclick="setFilter('__all')">전체 <span id="cnt-__all"></span></span>
+      <span class="chip" data-status="등록됨" onclick="setFilter('등록됨')">등록됨 <span id="cnt-등록됨"></span></span>
+      <span class="chip" data-status="진행중" onclick="setFilter('진행중')">진행중 <span id="cnt-진행중"></span></span>
+      <span class="chip" data-status="완료확인대기" onclick="setFilter('완료확인대기')">완료확인대기 <span id="cnt-완료확인대기"></span></span>
+      <span class="chip" data-status="완료" onclick="setFilter('완료')">완료 <span id="cnt-완료"></span></span>
+      <div class="search-box"><input id="searchInput" placeholder="동/호수 검색" oninput="renderIssues()"></div>
+    </div>
+    <div id="issueGrid" class="grid"></div>
+    <div id="issueEmpty" class="empty-state" style="display:none;">등록된 이슈가 없습니다. 상단의 "새 이슈 등록"으로 시작해보세요.</div>
+    <div id="issueLoading" class="loading-note">불러오는 중...</div>
+  </div>
+
+  <div class="tab-pane" id="tab-stats">
+    <div id="statsGrid" class="stats-grid"></div>
+    <div id="statsLoading" class="loading-note">불러오는 중...</div>
+  </div>
+</div>
+
+<!-- 이슈 등록 모달 -->
+<div class="overlay" id="createOverlay">
+  <div class="modal">
+    <button class="close-x" onclick="closeModal('createOverlay')">✕</button>
+    <h2>새 이슈 등록</h2>
+    <div class="field-row">
+      <div class="field"><label>동</label><input id="c_dong" placeholder="예: 102동"></div>
+      <div class="field"><label>호수</label><input id="c_ho" placeholder="예: 1902호"></div>
+    </div>
+    <div class="field">
+      <label>카테고리</label>
+      <select id="c_cat">
+        <option>누수</option><option>도장</option><option>타일</option><option>전기</option>
+        <option>도어/창호</option><option>바닥재</option><option>기타</option>
+      </select>
+    </div>
+    <div class="field"><label>문제 설명</label><textarea id="c_desc" placeholder="상황을 설명해주세요"></textarea></div>
+    <div class="field">
+      <label>사진 첨부 (선택, 여러 장 가능)</label>
+      <div class="dropzone" onclick="document.getElementById('c_photos').click()">📷 눌러서 사진 선택</div>
+      <input type="file" id="c_photos" accept="image/*" multiple onchange="handlePhotoSelect(this,'createPreview')">
+      <div class="photo-preview" id="createPreview"></div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>우선순위</label>
+        <select id="c_priority"><option>보통</option><option>긴급</option><option>낮음</option></select>
+      </div>
+      <div class="field"><label>희망완료일</label><input id="c_due" type="date"></div>
+    </div>
+    <div class="field">
+      <label>담당 업체 (바로 배정, 나중에 배정해도 됩니다)</label>
+      <select id="c_company"><option value="">— 나중에 배정 —</option></select>
+    </div>
+    <div class="field"><label>작업 지시사항</label><textarea id="c_instruction" placeholder="업체에게 전달할 구체적인 작업 내용"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('createOverlay')">취소</button>
+      <button class="btn-primary" onclick="submitCreate()">등록하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 이슈 상세 모달 -->
+<div class="overlay" id="detailOverlay">
+  <div class="modal">
+    <button class="close-x" onclick="closeModal('detailOverlay')">✕</button>
+    <h2 id="d_title"></h2>
+    <div id="d_body"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   설정 — 배포 후 이 값만 본인의 Apps Script 웹 앱 URL로 바꾸세요
+   ========================================================= */
+const API_URL = 'https://script.google.com/macros/s/AKfycby1a33-G9kATzhNLd9r24PLmayG7fiiDC5d_6NEjEtFtxf3Va21tSAv8BMbKWe1SQ_e/exec';
+
+const STATUS_COLORS = {
+  '등록됨': { bg: 'var(--neutral-bg)', text: 'var(--neutral-text)' },
+  '진행중': { bg: 'var(--info-bg)', text: 'var(--info-text)' },
+  '완료확인대기': { bg: 'var(--accent-bg)', text: 'var(--accent-text)' },
+  '완료': { bg: 'var(--good-bg)', text: 'var(--good-text)' },
+};
+
+let adminPin = '';
+let allIssues = [];
+let currentFilter = '__all';
+let pendingPhotos = { createPreview: [] };
+let companies = [];
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.display = 'none'; }, 2600);
+}
+
+function apiGet(params) {
+  const qs = new URLSearchParams(params).toString();
+  return fetch(API_URL + '?' + qs).then(r => r.json());
+}
+
+function apiPost(action, body) {
+  return fetch(API_URL + '?action=' + encodeURIComponent(action), {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body)
+  }).then(r => r.json());
+}
+
+/* ---------- login ---------- */
+function doLogin() {
+  const pin = document.getElementById('pinInput').value.trim();
+  if (!pin) return;
+  document.getElementById('loginError').textContent = '';
+  apiGet({ action: 'listIssues', adminPin: pin }).then(res => {
+    if (!res.ok) {
+      document.getElementById('loginError').textContent = res.error || '로그인에 실패했습니다.';
+      return;
+    }
+    adminPin = pin;
+    localStorage.setItem('as_admin_pin', pin);
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainScreen').style.display = 'block';
+    loadAll();
+  }).catch(() => {
+    document.getElementById('loginError').textContent = 'API 연결에 실패했습니다. API_URL 설정을 확인해주세요.';
+  });
+}
+
+function logout() {
+  localStorage.removeItem('as_admin_pin');
+  location.reload();
+}
+
+function tryAutoLogin() {
+  const saved = localStorage.getItem('as_admin_pin');
+  if (saved) {
+    document.getElementById('pinInput').value = saved;
+    doLogin();
+  }
+}
+
+/* ---------- tabs ---------- */
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'stats') loadStats();
+}
+
+/* ---------- load data ---------- */
+function loadAll() {
+  document.getElementById('issueLoading').style.display = 'block';
+  Promise.all([
+    apiGet({ action: 'listIssues', adminPin }),
+    apiGet({ action: 'listCompanies', adminPin })
+  ]).then(([issueRes, companyRes]) => {
+    document.getElementById('issueLoading').style.display = 'none';
+    if (issueRes.ok) { allIssues = issueRes.issues; renderIssues(); }
+    else toast(issueRes.error || '불러오기 실패');
+    if (companyRes.ok) {
+      companies = companyRes.companies;
+      const sel = document.getElementById('c_company');
+      sel.innerHTML = '<option value="">— 나중에 배정 —</option>' +
+        companies.map(c => `<option value="${escapeHtml(c.name)}" data-contact="${escapeHtml(c.contact||'')}">${escapeHtml(c.name)}</option>`).join('');
+    }
+  }).catch(() => {
+    document.getElementById('issueLoading').style.display = 'none';
+    toast('API 연결에 실패했습니다.');
+  });
+}
+
+function loadStats() {
+  document.getElementById('statsLoading').style.display = 'block';
+  apiGet({ action: 'stats', adminPin }).then(res => {
+    document.getElementById('statsLoading').style.display = 'none';
+    if (!res.ok) { toast(res.error || '통계를 불러오지 못했습니다.'); return; }
+    const grid = document.getElementById('statsGrid');
+    if (!res.stats.length) { grid.innerHTML = '<div class="empty-state">아직 데이터가 없습니다.</div>'; return; }
+    grid.innerHTML = res.stats.map(s => `
+      <div class="stat-card">
+        <h3>${escapeHtml(s.업체명)}</h3>
+        <div class="stat-line"><span>전체 건수</span><b>${s.전체건수}건</b></div>
+        <div class="stat-line"><span>완료</span><b>${s.완료건수}건</b></div>
+        <div class="stat-line"><span>진행중</span><b>${s.진행중건수}건</b></div>
+        <div class="stat-line"><span>반려율</span><b>${s.반려율}%</b></div>
+        <div class="stat-line"><span>평균 완료 소요일</span><b>${s.평균완료소요일 !== null ? s.평균완료소요일 + '일' : '—'}</b></div>
+      </div>
+    `).join('');
+  }).catch(() => {
+    document.getElementById('statsLoading').style.display = 'none';
+    toast('API 연결에 실패했습니다.');
+  });
+}
+
+/* ---------- render issue grid ---------- */
+function setFilter(status) {
+  currentFilter = status;
+  document.querySelectorAll('.chip[data-status]').forEach(c => c.classList.toggle('active', c.dataset.status === status));
+  renderIssues();
+}
+
+function renderIssues() {
+  const counts = { __all: allIssues.length, '등록됨': 0, '진행중': 0, '완료확인대기': 0, '완료': 0 };
+  allIssues.forEach(i => { if (counts[i.상태] !== undefined) counts[i.상태]++; });
+  Object.keys(counts).forEach(k => {
+    const el = document.getElementById('cnt-' + k);
+    if (el) el.textContent = counts[k];
+  });
+
+  const query = (document.getElementById('searchInput').value || '').trim();
+  let list = allIssues;
+  if (currentFilter !== '__all') list = list.filter(i => i.상태 === currentFilter);
+  if (query) list = list.filter(i => (i.동 + i.호수).includes(query));
+
+  const grid = document.getElementById('issueGrid');
+  document.getElementById('issueEmpty').style.display = list.length ? 'none' : 'block';
+  grid.innerHTML = list.map(issue => {
+    const c = STATUS_COLORS[issue.상태] || STATUS_COLORS['등록됨'];
+    const thumbUrl = firstPhoto(issue.요청사진);
+    return `
+      <div class="issue-card" onclick="openDetail('${escapeAttr(issue.issue_id)}')">
+        <div class="thumb" style="${thumbUrl ? `background-image:url('${thumbUrl}')` : ''}">${thumbUrl ? '' : '사진 없음'}</div>
+        <div class="ho">${escapeHtml(issue.동)} ${escapeHtml(issue.호수)}</div>
+        <div class="cat">${escapeHtml(issue.카테고리 || '기타')} · ${escapeHtml(issue.담당업체 || '미배정')}</div>
+        <span class="badge" style="background:${c.bg}; color:${c.text};">${escapeHtml(issue.상태)}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function firstPhoto(csv) {
+  if (!csv) return '';
+  const parts = String(csv).split(',').filter(Boolean);
+  return parts[0] || '';
+}
+
+/* ---------- create issue ---------- */
+function openCreateModal() {
+  document.getElementById('c_dong').value = '';
+  document.getElementById('c_ho').value = '';
+  document.getElementById('c_desc').value = '';
+  document.getElementById('c_instruction').value = '';
+  document.getElementById('c_due').value = '';
+  document.getElementById('c_company').value = '';
+  pendingPhotos.createPreview = [];
+  document.getElementById('createPreview').innerHTML = '';
+  document.getElementById('createOverlay').classList.add('active');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('active');
+}
+
+function handlePhotoSelect(input, previewId) {
+  const files = Array.from(input.files || []);
+  const preview = document.getElementById(previewId);
+  let remaining = files.length;
+  files.forEach(file => {
+    compressImage(file).then(compressed => {
+      pendingPhotos[previewId].push(compressed);
+      const img = document.createElement('img');
+      img.src = 'data:' + compressed.mimeType + ';base64,' + compressed.data;
+      preview.appendChild(img);
+    });
+  });
+}
+
+function compressImage(file, maxDim, quality) {
+  maxDim = maxDim || 1600;
+  quality = quality || 0.72;
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = e => { img.src = e.target.result; };
+    reader.onerror = reject;
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+        else { w = Math.round(w * maxDim / h); h = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      const base64 = dataUrl.split(',')[1];
+      resolve({ data: base64, mimeType: 'image/jpeg', name: file.name });
+    };
+    img.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function submitCreate() {
+  const dong = document.getElementById('c_dong').value.trim();
+  const ho = document.getElementById('c_ho').value.trim();
+  if (!dong || !ho) { toast('동/호수를 입력해주세요.'); return; }
+
+  const companySel = document.getElementById('c_company');
+  const companyName = companySel.value;
+  const companyContact = companyName ? (companySel.selectedOptions[0].dataset.contact || '') : '';
+
+  const body = {
+    adminPin,
+    동: dong,
+    호수: ho,
+    카테고리: document.getElementById('c_cat').value,
+    문제설명: document.getElementById('c_desc').value.trim(),
+    우선순위: document.getElementById('c_priority').value,
+    희망완료일: document.getElementById('c_due').value,
+    담당업체: companyName,
+    담당업체연락처: companyContact,
+    지시사항: document.getElementById('c_instruction').value.trim(),
+    photos: pendingPhotos.createPreview
+  };
+
+  toast('등록 중...');
+  apiPost('createIssue', body).then(res => {
+    if (!res.ok) { toast(res.error || '등록 실패'); return; }
+    toast('등록되었습니다: ' + res.issue_id);
+    closeModal('createOverlay');
+    loadAll();
+  }).catch(() => toast('API 연결에 실패했습니다.'));
+}
+
+/* ---------- issue detail ---------- */
+let detailPhotos = { reject: [] };
+
+function openDetail(issueId) {
+  const issue = allIssues.find(i => i.issue_id === issueId);
+  if (!issue) return;
+  document.getElementById('d_title').textContent = issue.동 + ' ' + issue.호수 + ' · ' + issue.issue_id;
+
+  const reqPhotos = String(issue.요청사진 || '').split(',').filter(Boolean);
+  const donePhotos = String(issue.완료사진 || '').split(',').filter(Boolean);
+
+  let html = `
+    <div class="detail-row"><b>상태:</b> ${escapeHtml(issue.상태)}</div>
+    <div class="detail-row"><b>카테고리:</b> ${escapeHtml(issue.카테고리 || '-')} · <b>우선순위:</b> ${escapeHtml(issue.우선순위 || '-')}</div>
+    <div class="detail-row"><b>문제설명:</b> ${escapeHtml(issue.문제설명 || '-')}</div>
+    <div class="compare-photos">
+      ${photoBoxHtml(reqPhotos, '요청 사진')}
+    </div>
+  `;
+
+  if (!issue.담당업체) {
+    // 미배정 → 배정 폼
+    html += `
+      <div class="field"><label>담당 업체</label>
+        <select id="assign_company">
+          <option value="">선택해주세요</option>
+          ${companies.map(c => `<option value="${escapeAttr(c.name)}" data-contact="${escapeAttr(c.contact||'')}">${escapeHtml(c.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>우선순위</label>
+          <select id="assign_priority">
+            <option ${issue.우선순위==='긴급'?'selected':''}>긴급</option>
+            <option ${(!issue.우선순위||issue.우선순위==='보통')?'selected':''}>보통</option>
+            <option ${issue.우선순위==='낮음'?'selected':''}>낮음</option>
+          </select>
+        </div>
+        <div class="field"><label>희망완료일</label><input id="assign_due" type="date" value="${escapeAttr(issue.희망완료일||'')}"></div>
+      </div>
+      <div class="field"><label>작업 지시사항</label><textarea id="assign_instruction">${escapeHtml(issue.지시사항||'')}</textarea></div>
+      <div class="modal-actions">
+        <button class="btn-primary" onclick="submitAssign('${escapeAttr(issue.issue_id)}')">업체에게 지시 보내기</button>
+      </div>
+    `;
+  } else {
+    html += `
+      <div class="detail-row"><b>담당업체:</b> ${escapeHtml(issue.담당업체)} (${escapeHtml(issue.담당업체연락처||'-')})</div>
+      <div class="detail-row"><b>지시사항:</b> ${escapeHtml(issue.지시사항||'-')}</div>
+      <div class="detail-row"><b>희망완료일:</b> ${escapeHtml(issue.희망완료일||'-')}</div>
+    `;
+  }
+
+  if (issue.상태 === '완료확인대기') {
+    html += `
+      <div class="compare-photos">${photoBoxHtml(donePhotos, '완료 사진')}</div>
+      <div class="detail-row"><b>업체 메모:</b> ${escapeHtml(issue.업체메모||'-')}</div>
+      <div class="field"><label>반려 사유 (반려 시 입력)</label><textarea id="reject_reason"></textarea></div>
+      <div class="modal-actions">
+        <button class="btn-reject" onclick="submitConfirm('${escapeAttr(issue.issue_id)}', false)">반려</button>
+        <button class="btn-approve" onclick="submitConfirm('${escapeAttr(issue.issue_id)}', true)">완료 승인</button>
+      </div>
+    `;
+  } else if (issue.상태 === '완료') {
+    html += `
+      <div class="compare-photos">${photoBoxHtml(donePhotos, '완료 사진')}</div>
+      <div class="detail-row"><b>확인자:</b> ${escapeHtml(issue.확인자||'-')} · <b>확인일:</b> ${formatDate(issue.확인일)}</div>
+    `;
+  } else if (issue.반려사유) {
+    html += `<div class="detail-row"><b>최근 반려 사유:</b> ${escapeHtml(issue.반려사유)}</div>`;
+  }
+
+  document.getElementById('d_body').innerHTML = html;
+  document.getElementById('detailOverlay').classList.add('active');
+}
+
+function photoBoxHtml(urls, label) {
+  if (!urls.length) return `<div class="photo-box"><div class="none">${label} 없음</div></div>`;
+  return urls.map(u => `<div class="photo-box"><img src="${escapeAttr(u)}" loading="lazy"><div class="cap">${label}</div></div>`).join('');
+}
+
+function submitAssign(issueId) {
+  const sel = document.getElementById('assign_company');
+  const companyName = sel.value;
+  if (!companyName) { toast('업체를 선택해주세요.'); return; }
+  const companyContact = sel.selectedOptions[0].dataset.contact || '';
+  const body = {
+    adminPin,
+    issue_id: issueId,
+    담당업체: companyName,
+    담당업체연락처: companyContact,
+    우선순위: document.getElementById('assign_priority').value,
+    희망완료일: document.getElementById('assign_due').value,
+    지시사항: document.getElementById('assign_instruction').value.trim()
+  };
+  toast('배정 중...');
+  apiPost('assignIssue', body).then(res => {
+    if (!res.ok) { toast(res.error || '배정 실패'); return; }
+    toast('배정되었습니다.');
+    closeModal('detailOverlay');
+    loadAll();
+  }).catch(() => toast('API 연결에 실패했습니다.'));
+}
+
+function submitConfirm(issueId, approve) {
+  const reason = document.getElementById('reject_reason') ? document.getElementById('reject_reason').value.trim() : '';
+  if (!approve && !reason) { toast('반려 사유를 입력해주세요.'); return; }
+  const body = { adminPin, issue_id: issueId, approve, 반려사유: reason, 확인자: '관리팀' };
+  toast(approve ? '승인 처리 중...' : '반려 처리 중...');
+  apiPost('confirmCompletion', body).then(res => {
+    if (!res.ok) { toast(res.error || '처리 실패'); return; }
+    toast(approve ? '완료 승인되었습니다.' : '반려 처리되었습니다.');
+    closeModal('detailOverlay');
+    loadAll();
+  }).catch(() => toast('API 연결에 실패했습니다.'));
+}
+
+/* ---------- utils ---------- */
+function escapeHtml(str) {
+  return String(str == null ? '' : str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function escapeAttr(str) { return escapeHtml(str); }
+function formatDate(v) {
+  if (!v) return '-';
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return String(v);
+  return d.getFullYear() + '.' + (d.getMonth()+1) + '.' + d.getDate();
+}
+
+document.getElementById('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+tryAutoLogin();
+</script>
+</body>
+</html>
