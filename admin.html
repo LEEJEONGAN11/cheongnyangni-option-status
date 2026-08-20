@@ -62,7 +62,8 @@
   .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
   .issue-card { background: var(--surface-2); border:1px solid var(--border); border-radius: 12px; padding: 14px; cursor:pointer; transition: box-shadow .15s; }
   .issue-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,.06); }
-  .issue-card .thumb { height: 90px; border-radius: 8px; background: linear-gradient(135deg,#d9d6cd,#c7c3b6); background-size:cover; background-position:center; margin-bottom:10px; display:flex; align-items:center; justify-content:center; color: rgba(0,0,0,.35); font-size:12px; }
+  .issue-card .thumb { height: 90px; border-radius: 8px; background: linear-gradient(135deg,#d9d6cd,#c7c3b6); margin-bottom:10px; display:flex; align-items:center; justify-content:center; color: rgba(0,0,0,.35); font-size:12px; overflow:hidden; }
+  .issue-card .thumb img { width:100%; height:100%; object-fit:cover; display:block; }
   .issue-card .ho { font-size:13.5px; font-weight:800; margin-bottom:2px; }
   .issue-card .cat { font-size:11.5px; color: var(--text-muted); margin-bottom:8px; }
   .badge { display:inline-block; font-size:10.5px; font-weight:800; padding:4px 9px; border-radius:999px; }
@@ -104,6 +105,7 @@
     font-size:11px; color:var(--text-muted); background: var(--page-plane); text-align:center; padding:6px;
   }
   .photo-failed a { color: var(--info-text); }
+  .photo-failed.sm { width:100%; height:100%; font-size:10px; gap:0; padding:2px; background:transparent; }
   .detail-row { font-size: 12.5px; margin-bottom: 8px; }
   .detail-row b { color: var(--text-secondary); }
 
@@ -374,13 +376,14 @@ function renderIssues() {
     const thumbUrl = firstPhoto(issue.요청사진);
     return `
       <div class="issue-card" onclick="openDetail('${escapeAttr(issue.issue_id)}')">
-        <div class="thumb" style="${thumbUrl ? `background-image:url('${thumbUrl}')` : ''}">${thumbUrl ? '' : '사진 없음'}</div>
+        <div class="thumb">${thumbUrl ? photoImgHtml(thumbUrl, true) : '사진 없음'}</div>
         <div class="ho">${escapeHtml(issue.동)} ${escapeHtml(issue.호수)}</div>
         <div class="cat">${escapeHtml(issue.카테고리 || '기타')} · ${escapeHtml(issue.담당업체 || '미배정')}</div>
         <span class="badge" style="background:${c.bg}; color:${c.text};">${escapeHtml(issue.상태)}</span>
       </div>
     `;
   }).join('');
+  wirePhotoFallbacks(grid);
 }
 
 function firstPhoto(csv) {
@@ -607,35 +610,67 @@ function photoIdFrom(url) {
   return m ? m[1] : '';
 }
 
-function photoImgHtml(url) {
+function photoImgHtml(url, compact) {
   const id = photoIdFrom(url);
-  return `<img data-photo-id="${escapeAttr(id)}" src="${escapeAttr(url)}" loading="lazy" alt="사진">`;
+  return `<img data-photo-id="${escapeAttr(id)}"${compact ? ' data-compact="1"' : ''}` +
+         ` src="${escapeAttr(url)}" loading="lazy" alt="사진">`;
 }
 
 function markPhotoFailed(img) {
   const id = img.dataset.photoId;
+  const compact = img.dataset.compact === '1';
   const box = document.createElement('div');
-  box.className = 'photo-failed';
-  box.innerHTML = '사진을 불러오지 못했어요' +
+  box.className = compact ? 'photo-failed sm' : 'photo-failed';
+  box.innerHTML = compact ? '사진 없음' :
+    '사진을 불러오지 못했어요' +
     (id ? `<a href="https://drive.google.com/file/d/${encodeURIComponent(id)}/view" target="_blank" rel="noopener">드라이브에서 열기</a>` : '');
   if (img.parentNode) img.parentNode.replaceChild(box, img);
+}
+
+// 같은 사진을 두 번 받아오지 않도록 캐시합니다 (목록 썸네일 + 상세 사진)
+const photoCache = new Map();       // "id|thumb" -> dataUrl
+let drivePhotosBlocked = false;     // 드라이브 직접 링크가 막힌 환경인지 한 번 확인되면 이후엔 바로 API 사용
+
+function fetchPhotoViaApi(id, thumb) {
+  const cacheKey = id + '|' + (thumb ? '1' : '0');
+  if (photoCache.has(cacheKey)) return Promise.resolve(photoCache.get(cacheKey));
+  const params = { action: 'getPhoto', id, adminPin };
+  if (thumb) params.thumb = '1';
+  return apiGet(params).then(res => {
+    const url = (res && res.ok && res.dataUrl) ? res.dataUrl : null;
+    if (url) photoCache.set(cacheKey, url);
+    return url;
+  }).catch(() => null);
+}
+
+function loadViaApi(img, id, thumb) {
+  fetchPhotoViaApi(id, thumb).then(url => {
+    if (url) img.src = url;
+    else markPhotoFailed(img);
+  });
 }
 
 function wirePhotoFallbacks(root) {
   root.querySelectorAll('img[data-photo-id]').forEach(img => {
     if (img.dataset.wired === '1') return;
     img.dataset.wired = '1';
+    const id = img.dataset.photoId;
+    const thumb = img.dataset.compact === '1';
+    const cacheKey = id + '|' + (thumb ? '1' : '0');
+
+    if (id && photoCache.has(cacheKey)) { img.src = photoCache.get(cacheKey); return; }
+    // 드라이브 직접 링크가 막힌 게 이미 확인됐으면 헛되이 두 번 실패하지 않고 바로 API로
+    if (id && drivePhotosBlocked) { loadViaApi(img, id, thumb); return; }
+
     let stage = 0;
     img.addEventListener('error', () => {
-      const id = img.dataset.photoId;
       if (!id) { markPhotoFailed(img); return; }
       stage++;
       if (stage === 1) {
         img.src = 'https://lh3.googleusercontent.com/d/' + encodeURIComponent(id) + '=w1600';
       } else if (stage === 2) {
-        apiGet({ action: 'getPhoto', id, adminPin })
-          .then(res => { if (res && res.ok && res.dataUrl) img.src = res.dataUrl; else markPhotoFailed(img); })
-          .catch(() => markPhotoFailed(img));
+        drivePhotosBlocked = true;
+        loadViaApi(img, id, thumb);
       } else {
         markPhotoFailed(img);
       }
