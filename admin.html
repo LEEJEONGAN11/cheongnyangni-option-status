@@ -170,6 +170,20 @@
   .plan-zoom-inner { max-width:100%; max-height:100%; overflow:auto; -webkit-overflow-scrolling:touch; }
   .plan-zoom-stage { position:relative; display:inline-block; }
   .plan-zoom-stage img { display:block; max-width:none; width:min(1400px, 92vw); background:#fff; border-radius:4px; }
+
+  .plan-zoom-tools { position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:302;
+                     display:flex; gap:6px; align-items:center; background:rgba(255,255,255,.95);
+                     border-radius:999px; padding:6px 10px; max-width:92vw; flex-wrap:wrap;
+                     justify-content:center; box-shadow:0 4px 14px rgba(0,0,0,.3); }
+  .plan-zoom-tools .zbtn { padding:6px 12px; border-radius:999px; border:1px solid var(--border);
+                           background:var(--surface-1); font-size:12px; font-weight:700;
+                           cursor:pointer; font-family:inherit; color:var(--text-primary); }
+  .plan-zoom-tools .zbtn[aria-pressed="true"] { background:var(--text-primary); color:#fff;
+                                                border-color:var(--text-primary); }
+  .plan-zoom-tools .zsep { width:1px; height:18px; background:var(--gridline); }
+  .plan-zoom-tools .zcount { font-size:11.5px; color:var(--text-muted); font-weight:700; padding:0 4px; }
+  .plan-zoom-inner { padding-top:52px; }
+  .plan-zoom-stage.drawing { cursor:crosshair; touch-action:none; user-select:none; }
   .plan-zoom-close { position:fixed; top:16px; right:18px; width:38px; height:38px; border-radius:999px;
                      background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.35);
                      color:#fff; font-size:17px; cursor:pointer; z-index:301; }
@@ -211,9 +225,18 @@
 
   .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background: var(--text-primary); color:#fff; padding:11px 20px; border-radius:999px; font-size:13px; z-index:200; display:none; }
   .loading-note { font-size:12.5px; color: var(--text-muted); text-align:center; padding: 30px; }
+
+  .sys-banner { position:fixed; top:0; left:0; right:0; z-index:400; padding:11px 16px;
+                font-size:13px; line-height:1.65; text-align:center; display:none; }
+  .sys-banner.show { display:block; }
+  .sys-banner.warn { background:var(--accent); color:#1a1200; }
+  .sys-banner.err  { background:var(--danger); color:#fff; }
+  .sys-banner b { font-weight:800; }
+  .sys-banner code { background:rgba(0,0,0,.12); padding:1px 5px; border-radius:4px; }
 </style>
 </head>
 <body>
+<div class="sys-banner" id="sysBanner"></div>
 
 <div id="loginScreen">
   <div class="login-box">
@@ -399,11 +422,18 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="config.js"></script>
 <script>
 /* =========================================================
-   설정 — 배포 후 이 값만 본인의 Apps Script 웹 앱 URL로 바꾸세요
+   설정은 같은 폴더의 config.js 에서 읽어옵니다.
+   이 파일(HTML)은 업데이트 때 그냥 덮어쓰시면 되고,
+   주소는 config.js 에만 한 번 넣어두면 됩니다.
    ========================================================= */
-const API_URL = 'https://script.google.com/macros/s/AKfycbwrkU7A1rof1j2TrUXrpscs7WsBq-1qZJyV0CLP9T6k_TP-gu-IUo1PPW9EC3sef4B8/exec';
+const CFG = window.AS_CONFIG || {};
+const API_URL = CFG.apiUrl || 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+// config.js 에 넣어도 되고, 바로 아래 줄을 직접 고쳐도 됩니다. 둘 다 됩니다.
+const API_READY = API_URL.indexOf('PASTE_YOUR') < 0;
+const SCHEMA_EXPECTED = 3;      // 이 화면이 기대하는 서버 버전
 
 const STATUS_COLORS = {
   '등록됨': { bg: 'var(--neutral-bg)', text: 'var(--neutral-text)' },
@@ -429,9 +459,38 @@ function toast(msg) {
   t._timer = setTimeout(() => { t.style.display = 'none'; }, 2600);
 }
 
+/* ---------- 설정·버전 안내 배너 ---------- */
+// 흔한 실수 두 가지를 화면이 스스로 알려줍니다.
+//  1) config.js 에 주소를 안 넣음   2) Code.gs 를 새 버전으로 재배포 안 함
+function showBanner(kind, html) {
+  const el = document.getElementById('sysBanner');
+  if (!el) return;
+  el.className = 'sys-banner show ' + kind;
+  el.innerHTML = html;
+  document.body.style.paddingTop = el.offsetHeight + 'px';
+}
+
+let schemaWarned = false;
+function checkServerVersion(res) {
+  if (schemaWarned || !res || typeof res.v === 'undefined') return;
+  if (Number(res.v) < SCHEMA_EXPECTED) {
+    schemaWarned = true;
+    showBanner('warn',
+      '⚠️ <b>서버가 아직 예전 버전입니다 (v' + res.v + ' → v' + SCHEMA_EXPECTED + ' 필요).</b> ' +
+      'Apps Script에서 <code>배포 → 배포 관리 → 연필 → 새 버전 → 배포</code> 를 해주세요. ' +
+      '그전까지는 새 기능이 저장되지 않습니다.');
+  }
+}
+
+if (!API_READY) {
+  showBanner('err',
+    '⛔ <b>접속 주소가 설정되지 않았습니다.</b> 같은 폴더의 <code>config.js</code> 를 열어 ' +
+    '<code>apiUrl</code> 에 Apps Script 웹 앱 주소를 넣어주세요.');
+}
+
 function apiGet(params) {
   const qs = new URLSearchParams(params).toString();
-  return fetch(API_URL + '?' + qs).then(r => r.json());
+  return fetch(API_URL + '?' + qs).then(r => r.json()).then(res => { checkServerVersion(res); return res; });
 }
 
 function apiPost(action, body) {
@@ -439,7 +498,7 @@ function apiPost(action, body) {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify(body)
-  }).then(r => r.json());
+  }).then(r => r.json()).then(res => { checkServerVersion(res); return res; });
 }
 
 /* ---------- login ---------- */
@@ -1352,7 +1411,7 @@ function submitConfirm(issueId, approve) {
    ======================================================================= */
 var UNIT_TYPES = {"101":{"201":{"t":"59C","x":1},"202":{"t":"52A","x":1},"203":{"t":"55A","x":1},"204":{"t":"59A","x":1},"205":{"t":"59A","x":1},"301":{"t":"59C","x":1},"302":{"t":"52A","x":1},"303":{"t":"55A","x":1},"304":{"t":"59A","x":1},"305":{"t":"59A","x":1},"401":{"t":"59C","x":1},"402":{"t":"52A","x":0},"403":{"t":"55A","x":1},"404":{"t":"59A","x":1},"405":{"t":"59A","x":1},"501":{"t":"59C","x":1},"502":{"t":"52A","x":0},"503":{"t":"55A","x":1},"504":{"t":"59A","x":1},"505":{"t":"59A","x":1},"601":{"t":"59C","x":1},"602":{"t":"52A","x":0},"603":{"t":"55A","x":1},"604":{"t":"59A","x":1},"605":{"t":"59A","x":1},"701":{"t":"59C","x":1},"702":{"t":"52A","x":0},"703":{"t":"55A","x":1},"704":{"t":"59A","x":1},"705":{"t":"59A","x":1},"801":{"t":"59C","x":1},"802":{"t":"52A","x":0},"803":{"t":"55A","x":1},"804":{"t":"59A","x":1},"805":{"t":"59A","x":1},"901":{"t":"59C","x":1},"902":{"t":"52A","x":0},"903":{"t":"55A","x":1},"904":{"t":"59A","x":1},"905":{"t":"59A","x":1},"1001":{"t":"59C","x":1},"1002":{"t":"52A","x":0},"1003":{"t":"55A","x":1},"1004":{"t":"59A","x":1},"1005":{"t":"59A","x":1},"1101":{"t":"59C","x":1},"1102":{"t":"52A","x":1},"1103":{"t":"55A","x":1},"1104":{"t":"59A","x":1},"1105":{"t":"59A","x":1},"1201":{"t":"59D","x":1},"1202":{"t":"52A","x":1},"1203":{"t":"55A","x":1},"1204":{"t":"59A","x":1},"1205":{"t":"59A","x":1},"1301":{"t":"59D","x":1},"1302":{"t":"52A","x":0},"1303":{"t":"55A","x":1},"1304":{"t":"59A","x":1},"1305":{"t":"59A","x":1},"1401":{"t":"59D","x":1},"1402":{"t":"52A","x":0},"1403":{"t":"55A","x":1},"1404":{"t":"59A","x":1},"1405":{"t":"59A","x":1},"1501":{"t":"59D","x":1},"1502":{"t":"43","x":1},"1503":{"t":"55A","x":1},"1504":{"t":"59A","x":1},"1505":{"t":"59A","x":1},"1601":{"t":"48B","x":1},"1603":{"t":"59F","x":1},"1604":{"t":"59A","x":1},"1605":{"t":"48A","x":1}},"102":{"201":{"t":"68","x":0},"202":{"t":"79","x":0},"203":{"t":"84","x":0},"204":{"t":"65A","x":0},"205":{"t":"65B","x":0},"301":{"t":"68","x":0},"302":{"t":"79","x":0},"303":{"t":"84","x":0},"304":{"t":"65A","x":0},"305":{"t":"65B","x":0},"401":{"t":"68","x":0},"402":{"t":"79","x":0},"403":{"t":"84","x":0},"404":{"t":"65A","x":0},"405":{"t":"65B","x":0},"501":{"t":"68","x":0},"502":{"t":"79","x":0},"503":{"t":"84","x":0},"504":{"t":"65A","x":0},"505":{"t":"65B","x":0},"601":{"t":"68","x":0},"602":{"t":"79","x":0},"603":{"t":"84","x":0},"604":{"t":"65A","x":0},"605":{"t":"65B","x":0},"701":{"t":"55B","x":1},"702":{"t":"59B","x":1},"703":{"t":"59E","x":1},"704":{"t":"52B","x":1},"705":{"t":"52C","x":0},"801":{"t":"55B","x":1},"802":{"t":"59B","x":1},"803":{"t":"59E","x":1},"804":{"t":"52B","x":1},"805":{"t":"52C","x":0},"901":{"t":"55B","x":1},"902":{"t":"59B","x":1},"903":{"t":"59E","x":1},"904":{"t":"52B","x":1},"905":{"t":"52C","x":0},"1001":{"t":"55B","x":1},"1002":{"t":"59B","x":1},"1003":{"t":"59E","x":1},"1004":{"t":"52B","x":1},"1005":{"t":"52C","x":1},"1101":{"t":"55B","x":1},"1102":{"t":"59B","x":1},"1103":{"t":"59E","x":1},"1104":{"t":"52B","x":1},"1105":{"t":"52C","x":0},"1201":{"t":"55B","x":1},"1202":{"t":"59B","x":1},"1203":{"t":"59E","x":1},"1204":{"t":"52B","x":1},"1205":{"t":"52C","x":0},"1301":{"t":"55B","x":1},"1302":{"t":"59B","x":1},"1303":{"t":"59E","x":1},"1401":{"t":"55B","x":1},"1402":{"t":"59B","x":1},"1403":{"t":"59E","x":1},"1404":{"t":"52B","x":1},"1501":{"t":"55B","x":1},"1502":{"t":"59B","x":1},"1503":{"t":"59E","x":1},"1504":{"t":"52B","x":1},"1601":{"t":"55B","x":1},"1602":{"t":"59B","x":1},"1603":{"t":"59E","x":1},"1604":{"t":"52B","x":1},"1701":{"t":"55B","x":1},"1702":{"t":"59B","x":1},"1703":{"t":"59E","x":1},"1704":{"t":"52B","x":1},"1801":{"t":"55B","x":1},"1802":{"t":"59B","x":1},"1803":{"t":"59E","x":1},"1804":{"t":"52B","x":1},"1901":{"t":"55B","x":1},"1902":{"t":"59B","x":1},"1903":{"t":"59E","x":1}}};
 
-var PLAN_DIR = 'images/';                      // 평면도 폴더가 다르면 이 줄만 바꾸세요
+var PLAN_DIR = (window.AS_CONFIG && window.AS_CONFIG.planDir) || 'images/';
 var PLAN_EXTS = ['jpg', 'jpeg', 'png', 'webp'];
 var PLAN_DEFAULT_VARIANT = '확장형';   // 도면은 확장형 기준
 var planSrcCache = {};
@@ -1436,6 +1495,66 @@ function shapesHtml(shapes) {
   }).join('');
 }
 
+/* ---- 영역 드래그 (작은 도면 · 확대 화면 공통) ---- */
+function attachRegionDrag(box, state, onCommit) {
+  var drag = null;
+
+  function rel(ev) {
+    var r = box.getBoundingClientRect();
+    var t = (ev.touches && ev.touches.length) ? ev.touches[0]
+          : (ev.changedTouches && ev.changedTouches.length) ? ev.changedTouches[0] : ev;
+    if (typeof t.clientX !== 'number') return null;
+    return { x: Math.min(1, Math.max(0, (t.clientX - r.left) / r.width)),
+             y: Math.min(1, Math.max(0, (t.clientY - r.top) / r.height)) };
+  }
+  function boxOf(x1, y1, x2, y2) {
+    return { t: 'r', x: Math.min(x1, x2), y: Math.min(y1, y2),
+             w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) };
+  }
+  function preview(b) {
+    var old = box.querySelector('.plan-rgn.preview');
+    if (old) old.remove();
+    if (!b) return;
+    var el = document.createElement('div');
+    el.className = 'plan-rgn preview';
+    el.style.left = (b.x * 100) + '%'; el.style.top = (b.y * 100) + '%';
+    el.style.width = (b.w * 100) + '%'; el.style.height = (b.h * 100) + '%';
+    box.appendChild(el);
+  }
+  function onDown(ev) {
+    if (box.dataset.drawoff === '1') return;          // 이동 모드일 때는 무시
+    if (ev.target.closest('[data-plan-zoom]')) return;
+    var p = rel(ev); if (!p) return;
+    drag = { sx: p.x, sy: p.y };
+    if (ev.cancelable) ev.preventDefault();
+  }
+  function onMove(ev) {
+    if (!drag) return;
+    var p = rel(ev); if (!p) return;
+    preview(boxOf(drag.sx, drag.sy, p.x, p.y));
+    if (ev.cancelable) ev.preventDefault();
+  }
+  function onUp(ev) {
+    if (!drag) return;
+    var p = rel(ev);
+    var b = p ? boxOf(drag.sx, drag.sy, p.x, p.y) : null;
+    drag = null;
+    preview(null);
+    if (!b) return;
+    // 거의 안 움직였으면 "점 찍기"로 처리
+    if (b.w < 0.025 || b.h < 0.025) state.shapes.push({ t: 'p', x: b.x + b.w / 2, y: b.y + b.h / 2 });
+    else state.shapes.push(b);
+    if (onCommit) onCommit();
+  }
+
+  box.addEventListener('mousedown', onDown);
+  box.addEventListener('touchstart', onDown, { passive: false });
+  window.addEventListener('mousemove', onMove);
+  box.addEventListener('touchmove', onMove, { passive: false });
+  window.addEventListener('mouseup', onUp);
+  box.addEventListener('touchend', onUp);
+}
+
 /* ---- 도면 크게 보기 ---- */
 function ensurePlanZoom() {
   if (document.getElementById('planZoom')) return;
@@ -1443,6 +1562,7 @@ function ensurePlanZoom() {
   z.id = 'planZoom';
   z.className = 'plan-zoom';
   z.innerHTML = '<button type="button" class="plan-zoom-close" aria-label="닫기">✕</button>' +
+                '<div class="plan-zoom-tools" id="planZoomTools"></div>' +
                 '<div class="plan-zoom-inner"><div class="plan-zoom-stage"></div></div>';
   document.body.appendChild(z);
   z.querySelector('.plan-zoom-close').addEventListener('click', function () { z.classList.remove('open'); });
@@ -1452,11 +1572,55 @@ function ensurePlanZoom() {
   });
 }
 
-function openPlanZoom(src, shapes) {
+/**
+ * 도면을 크게 띄웁니다.
+ * pickable 이면 확대한 상태에서도 드래그해서 범위를 표시할 수 있습니다.
+ */
+function openPlanZoom(src, state, pickable, onCommit) {
   ensurePlanZoom();
   var z = document.getElementById('planZoom');
-  z.querySelector('.plan-zoom-stage').innerHTML =
-    '<img src="' + escapeAttr(src) + '" alt="평면도 크게 보기">' + shapesHtml(shapes);
+  var stageWrap = z.querySelector('.plan-zoom-stage');
+  var tools = z.querySelector('.plan-zoom-tools');
+  var drawMode = false;    // 기본은 "이동" — 확대한 화면을 손으로 움직일 수 있게
+
+  function draw() {
+    stageWrap.innerHTML = '<img src="' + escapeAttr(src) + '" alt="평면도 크게 보기">' +
+                          shapesHtml(state.shapes);
+    stageWrap.dataset.drawoff = drawMode ? '0' : '1';
+    stageWrap.classList.toggle('drawing', drawMode);
+    if (pickable) renderTools();
+  }
+
+  function renderTools() {
+    tools.innerHTML =
+      '<button type="button" class="zbtn" data-mode="pan"' + (drawMode ? '' : ' aria-pressed="true"') + '>✋ 이동</button>' +
+      '<button type="button" class="zbtn" data-mode="draw"' + (drawMode ? ' aria-pressed="true"' : '') + '>✏️ 표시</button>' +
+      '<span class="zsep"></span>' +
+      '<button type="button" class="zbtn" data-z-undo="1">되돌리기</button>' +
+      '<button type="button" class="zbtn" data-z-clear="1">모두 지우기</button>' +
+      '<span class="zcount">' + state.shapes.length + '곳</span>';
+    tools.querySelectorAll('[data-mode]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        drawMode = b.dataset.mode === 'draw';
+        draw();
+      });
+    });
+    tools.querySelector('[data-z-undo]').addEventListener('click', function () {
+      state.shapes.pop(); draw(); if (onCommit) onCommit();
+    });
+    tools.querySelector('[data-z-clear]').addEventListener('click', function () {
+      state.shapes = []; draw(); if (onCommit) onCommit();
+    });
+  }
+
+  tools.style.display = pickable ? '' : 'none';
+  draw();
+  if (pickable) {
+    attachRegionDrag(stageWrap, state, function () {
+      draw();
+      if (onCommit) onCommit();
+    });
+  }
   z.classList.add('open');
 }
 
@@ -1503,7 +1667,8 @@ function renderPlan(host, state, pickable, onChange) {
               '<button type="button" class="vbtn ghost" data-plan-clear="1">모두 지우기</button>' +
               '</div>' +
               '<div class="plan-hint">문제가 있는 <b>범위를 드래그</b>해서 네모로 표시해주세요. ' +
-              '짧게 톡 누르면 점으로도 찍힙니다. 현재 <b>' + state.shapes.length + '곳</b>.' +
+              '짧게 톡 누르면 점으로도 찍힙니다. 현재 <b>' + state.shapes.length + '곳</b>.<br>' +
+              '작게 보여서 어려우면 <b>🔍 크게</b> 를 눌러 확대한 뒤 <b>✏️ 표시</b> 로 바꾸면 크게 보면서 그릴 수 있습니다.' +
               (state.variant !== '확장형'
                 ? '<br>이 타입은 확장형 도면이 없어 <b>기본형</b>으로 표시했습니다.' : '') +
               '</div>';
@@ -1513,81 +1678,24 @@ function renderPlan(host, state, pickable, onChange) {
     host.innerHTML = html;
 
     var box = host.querySelector('.plan-box');
+    var redraw = function () {
+      renderPlan(host, state, pickable, onChange);
+      if (onChange) onChange(state);
+    };
+
     var zoomBtn = host.querySelector('[data-plan-zoom]');
     if (zoomBtn) zoomBtn.addEventListener('click', function (e) {
       e.stopPropagation();
-      openPlanZoom(src, state.shapes);
+      openPlanZoom(src, state, pickable, redraw);
     });
     if (!pickable) return;
 
-    // ---- 드래그로 영역 표시 ----
-    var drag = null;
-    function rel(ev) {
-      var r = box.getBoundingClientRect();
-      var t = (ev.touches && ev.touches.length) ? ev.touches[0]
-            : (ev.changedTouches && ev.changedTouches.length) ? ev.changedTouches[0] : ev;
-      if (typeof t.clientX !== 'number') return null;
-      return { x: Math.min(1, Math.max(0, (t.clientX - r.left) / r.width)),
-               y: Math.min(1, Math.max(0, (t.clientY - r.top) / r.height)) };
-    }
-    function preview(b) {
-      var old = box.querySelector('.plan-rgn.preview');
-      if (old) old.remove();
-      if (!b) return;
-      var el = document.createElement('div');
-      el.className = 'plan-rgn preview';
-      el.style.left = (b.x * 100) + '%'; el.style.top = (b.y * 100) + '%';
-      el.style.width = (b.w * 100) + '%'; el.style.height = (b.h * 100) + '%';
-      box.appendChild(el);
-    }
-    function boxOf(x1, y1, x2, y2) {
-      return { t: 'r', x: Math.min(x1, x2), y: Math.min(y1, y2),
-               w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) };
-    }
-    function onDown(ev) {
-      if (ev.target.closest('[data-plan-zoom]')) return;
-      var p = rel(ev); if (!p) return;
-      drag = { sx: p.x, sy: p.y };
-      if (ev.cancelable) ev.preventDefault();
-    }
-    function onMove(ev) {
-      if (!drag) return;
-      var p = rel(ev); if (!p) return;
-      preview(boxOf(drag.sx, drag.sy, p.x, p.y));
-      if (ev.cancelable) ev.preventDefault();
-    }
-    function onUp(ev) {
-      if (!drag) return;
-      var p = rel(ev);
-      var b = p ? boxOf(drag.sx, drag.sy, p.x, p.y) : null;
-      drag = null;
-      preview(null);
-      if (!b) return;
-      // 거의 안 움직였으면 "점 찍기"로 처리
-      if (b.w < 0.025 || b.h < 0.025) state.shapes.push({ t: 'p', x: b.x + b.w / 2, y: b.y + b.h / 2 });
-      else state.shapes.push(b);
-      renderPlan(host, state, true, onChange);
-      if (onChange) onChange(state);
-    }
-    box.addEventListener('mousedown', onDown);
-    box.addEventListener('touchstart', onDown, { passive: false });
-    window.addEventListener('mousemove', onMove);
-    box.addEventListener('touchmove', onMove, { passive: false });
-    window.addEventListener('mouseup', onUp);
-    box.addEventListener('touchend', onUp);
+    attachRegionDrag(box, state, redraw);
 
     var undo = host.querySelector('[data-plan-undo]');
-    if (undo) undo.addEventListener('click', function () {
-      state.shapes.pop();
-      renderPlan(host, state, true, onChange);
-      if (onChange) onChange(state);
-    });
+    if (undo) undo.onclick = function () { state.shapes.pop(); redraw(); };
     var clr = host.querySelector('[data-plan-clear]');
-    if (clr) clr.addEventListener('click', function () {
-      state.shapes = [];
-      renderPlan(host, state, true, onChange);
-      if (onChange) onChange(state);
-    });
+    if (clr) clr.onclick = function () { state.shapes = []; redraw(); };
   });
 }
 
