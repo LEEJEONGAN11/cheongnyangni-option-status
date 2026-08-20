@@ -32,6 +32,7 @@
   .login-box h1 { font-size: 16px; margin: 0 0 4px; }
   .login-box p { font-size: 12px; color: var(--text-muted); margin: 0 0 18px; }
   .pin-display { font-size: 26px; font-weight: 800; letter-spacing: 10px; min-height: 34px; margin-bottom: 16px; }
+  .pin-display.empty { color: var(--text-muted); font-size: 20px; letter-spacing: 2px; }
   .pin-pad { display:grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 16px; }
   .pin-key { padding: 16px; border-radius: 10px; background: var(--page-plane); border:1px solid var(--gridline); font-weight:700; font-size:16px; cursor:pointer; user-select:none; }
   .pin-key:active { background: var(--gridline); }
@@ -182,15 +183,44 @@ function apiPost(action, body) {
 }
 
 /* ---------- pin pad ---------- */
+const PIN_MAX = 8;
+
 function pinPress(d) {
-  if (pinValue.length >= 8) return;
+  if (pinValue.length >= PIN_MAX) {
+    document.getElementById('loginError').textContent = '"지우기"를 누르고 다시 입력해주세요.';
+    return;
+  }
+  document.getElementById('loginError').textContent = '';
   pinValue += d;
   renderPin();
 }
-function pinBackspace() { pinValue = pinValue.slice(0, -1); renderPin(); }
-function pinClear() { pinValue = ''; renderPin(); }
+function pinBackspace() {
+  pinValue = pinValue.slice(0, -1);
+  document.getElementById('loginError').textContent = '';
+  renderPin();
+}
+function pinClear() {
+  pinValue = '';
+  document.getElementById('loginError').textContent = '';
+  renderPin();
+}
 function renderPin() {
-  document.getElementById('pinDisplay').textContent = pinValue ? pinValue.replace(/./g, '•') : '••••';
+  const el = document.getElementById('pinDisplay');
+  // 입력한 자릿수만큼만 점을 찍습니다. (비어 있는데 ●●●● 로 보이면 헷갈립니다)
+  if (!pinValue) { el.textContent = '– – – –'; el.classList.add('empty'); }
+  else { el.textContent = pinValue.replace(/./g, '•'); el.classList.remove('empty'); }
+}
+
+let autoLoginTry = false;
+
+/* 로그인 실패 시에는 입력을 반드시 비웁니다.
+   안 비우면 다음에 누르는 숫자가 뒤에 붙어서 "PIN이 안 먹는" 것처럼 보입니다. */
+function failLogin(msg) {
+  localStorage.removeItem('as_contractor_pin');
+  pinValue = '';
+  renderPin();
+  document.getElementById('loginError').textContent = autoLoginTry ? '' : (msg || '');
+  autoLoginTry = false;
 }
 
 function doLogin() {
@@ -198,19 +228,20 @@ function doLogin() {
   document.getElementById('loginError').textContent = '';
   apiGet({ action: 'listIssues', pin: pinValue }).then(res => {
     if (!res.ok) {
-      document.getElementById('loginError').textContent = res.error || 'PIN이 올바르지 않습니다.';
+      failLogin(res.error || 'PIN이 올바르지 않습니다.');
       return;
     }
     companyPin = pinValue;
     companyName = res.companyName;
     localStorage.setItem('as_contractor_pin', companyPin);
+    autoLoginTry = false;
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('mainScreen').style.display = 'block';
     document.getElementById('companyTitle').textContent = companyName + ' · 작업 목록';
     myIssues = res.issues;
     renderList();
   }).catch(() => {
-    document.getElementById('loginError').textContent = 'API 연결에 실패했습니다.';
+    failLogin('접속에 실패했습니다. 잠시 후 다시 시도해주세요.');
   });
 }
 
@@ -221,7 +252,8 @@ function logout() {
 
 function tryAutoLogin() {
   const saved = localStorage.getItem('as_contractor_pin');
-  if (saved) { pinValue = saved; doLogin(); }
+  if (saved) { autoLoginTry = true; pinValue = saved; renderPin(); doLogin(); }
+  else { renderPin(); }
 }
 
 function loadMine() {

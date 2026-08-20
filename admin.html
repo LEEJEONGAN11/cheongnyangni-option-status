@@ -276,15 +276,29 @@ function apiPost(action, body) {
 }
 
 /* ---------- login ---------- */
+let autoLoginTry = false;
+
+/* 로그인 실패 시 저장된 PIN과 입력칸을 비웁니다.
+   안 비우면 예전 값이 남아서 다시 시도할 때 헷갈립니다. */
+function failLogin(msg) {
+  localStorage.removeItem('as_admin_pin');
+  const box = document.getElementById('pinInput');
+  box.value = '';
+  box.focus();
+  document.getElementById('loginError').textContent = autoLoginTry ? '' : (msg || '');
+  autoLoginTry = false;
+}
+
 function doLogin() {
   const pin = document.getElementById('pinInput').value.trim();
   if (!pin) return;
   document.getElementById('loginError').textContent = '';
   apiGet({ action: 'listIssues', adminPin: pin }).then(res => {
     if (!res.ok) {
-      document.getElementById('loginError').textContent = res.error || '로그인에 실패했습니다.';
+      failLogin(res.error || '로그인에 실패했습니다.');
       return;
     }
+    autoLoginTry = false;
     adminPin = pin;
     localStorage.setItem('as_admin_pin', pin);
     document.getElementById('loginScreen').style.display = 'none';
@@ -295,7 +309,7 @@ function doLogin() {
     renderIssues();
     loadSideData();
   }).catch(() => {
-    document.getElementById('loginError').textContent = 'API 연결에 실패했습니다. API_URL 설정을 확인해주세요.';
+    failLogin('접속에 실패했습니다. 상단 API_URL 설정과 인터넷 연결을 확인해주세요.');
   });
 }
 
@@ -307,6 +321,7 @@ function logout() {
 function tryAutoLogin() {
   const saved = localStorage.getItem('as_admin_pin');
   if (saved) {
+    autoLoginTry = true;
     document.getElementById('pinInput').value = saved;
     doLogin();
   }
