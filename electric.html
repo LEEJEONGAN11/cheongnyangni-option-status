@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>청량리역 요진 와이시티 - 전기공사 옵션</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="viz-root" data-palette="#eda100,#2a78d6,#898781">
+
+  <div class="navbar">
+    <a class="home" href="index.html">← 처음으로</a>
+    <a class="home" href="contract.html">📋 옵션 계약 현황</a>
+    <span class="spacer"></span>
+    <button type="button" class="srv" id="srvChip">서버 확인 중…</button>
+    <button type="button" class="srv" id="editChip" hidden>✏️ 수정하기</button>
+  </div>
+
+  <div class="sysbar" id="sysBar" hidden></div>
+
+  <header class="top">
+    <div>
+      <h1>청량리역 요진 와이시티 — 단위세대 전기공사 옵션</h1>
+      <p class="subtitle">입면정리 기준 · 해당 번호 확인 후 시공 · 정리일 2026-08-18</p>
+    </div>
+  </header>
+
+  <div class="stat-row">
+    <div class="stat-tile"><div class="label">전체 세대</div><div class="value" id="statTotal">-</div></div>
+    <div class="stat-tile good"><div class="label">전기공사 대상</div><div class="value" id="statTarget">-</div></div>
+    <div class="stat-tile info"><div class="label">연 시공 건수</div><div class="value" id="statJobs">-</div></div>
+    <div class="stat-tile"><div class="label">공사 품목</div><div class="value" id="statItems">-</div></div>
+  </div>
+
+  <div class="option-panel">
+    <div class="option-panel-head">
+      <span class="option-panel-title">공사 품목 (번호를 누르면 그 공사가 있는 세대만 강조됩니다)</span>
+      <span class="option-panel-hint" id="optionActiveHint"></span>
+      <button type="button" id="pdfBtn" class="pdf-btn" disabled>📄 PDF로 출력</button>
+    </div>
+    <div class="option-chip-row" id="optionChipRow"></div>
+    <ul class="item-list" id="itemList" style="margin-top:12px;"></ul>
+  </div>
+
+  <div class="legend">
+    <span class="chip"><span class="swatch" style="background:var(--accent-bg); border:1px solid var(--accent)"></span>전기공사 대상</span>
+    <span class="chip"><span class="swatch" style="background:var(--surface-1); border:1px solid var(--border)"></span>해당 없음</span>
+    <span class="chip">호수를 클릭하면 도면과 상세가 열려요</span>
+  </div>
+
+  <div class="controls">
+    <input type="text" id="searchBox" placeholder="호수로 검색 (예: 1902, 501)">
+    <button class="filter-btn" data-filter="all" aria-pressed="true" type="button">전체</button>
+    <button class="filter-btn" data-filter="target" aria-pressed="false" type="button">전기공사 대상만</button>
+    <button class="filter-btn" data-filter="plain" aria-pressed="false" type="button">해당 없는 세대만</button>
+  </div>
+
+  <div class="print-only" id="printHead">
+    <h2 id="printTitle"></h2>
+    <p id="printMeta"></p>
+    <div id="printList"></div>
+  </div>
+
+  <div class="buildings">
+    <div class="building">
+      <h2>101동</h2>
+      <div id="grid101"></div>
+    </div>
+    <div class="building">
+      <h2>102동</h2>
+      <div id="grid102"></div>
+    </div>
+  </div>
+
+  <footer class="note" id="footNote"></footer>
+
+  <div class="backdrop" id="backdrop">
+    <div class="modal modal-wrap" id="modal" role="dialog" aria-modal="true">
+      <button class="close-btn" id="closeBtn" aria-label="닫기">✕</button>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <div class="backdrop" id="pinBackdrop" style="z-index:80;">
+    <div class="modal modal-wrap" style="max-width:400px;">
+      <button class="close-btn" id="pinClose" aria-label="닫기">✕</button>
+      <div id="pinBody"></div>
+    </div>
+  </div>
+
+  <div class="lightbox-backdrop" id="lightbox">
+    <button class="lightbox-close" id="lightboxClose" aria-label="닫기">✕</button>
+    <img id="lightboxImg" src="" alt="도면 크게보기">
+  </div>
+
+</div>
+
+<script src="config.js"></script>
+<script src="data.js"></script>
+<script src="store.js"></script>
+<script src="plans.js"></script>
+<script src="editui.js"></script>
+<script>
+(function () {
+  'use strict';
+  var D = window.WYC, S = window.WYCStore, P = window.WYCPlans, U = window.WYCEdit;
+  var ITEMS = D.electricItems;               // [{no, name, desc[]}]
+  var KIND = '전기';
+
+  /* ---------- 원본 + 수정내역을 합친 "지금 값" ---------- */
+  function optsOf(u) {
+    var c = S.get(KIND, u.dong + u.ho);
+    return (c && c.opts) ? c.opts.slice() : (u.eopts || []).slice();
+  }
+  function isEdited(u) { return S.edited(KIND, u.dong + u.ho); }
+
+  var UNITS = D.units;
+  var allUnits = Object.keys(UNITS).map(function (k) { return UNITS[k]; });
+
+  /* ---------- 통계 ---------- */
+  function paintStats() {
+    var target = 0, jobs = 0;
+    allUnits.forEach(function (u) {
+      var o = optsOf(u);
+      if (o.length) { target++; jobs += o.length; }
+    });
+    document.getElementById('statTotal').textContent = allUnits.length + '세대';
+    document.getElementById('statTarget').textContent = target + '세대';
+    document.getElementById('statJobs').textContent = jobs + '건';
+    document.getElementById('statItems').textContent = ITEMS.length + '개';
+  }
+
+  /* ---------- 품목 목록 · 칩 ---------- */
+  function itemCount(no) {
+    var n = 0;
+    allUnits.forEach(function (u) { if (optsOf(u).indexOf(no) >= 0) n++; });
+    return n;
+  }
+
+  function paintItems() {
+    var list = document.getElementById('itemList');
+    list.innerHTML = ITEMS.map(function (it) {
+      return '<li><span class="no">' + it.no + '</span><div class="body">' +
+             '<div class="nm">' + esc(it.name) + '</div>' +
+             (it.desc.length ? '<div class="ds">' + it.desc.map(esc).join('<br>') + '</div>' : '') +
+             '</div></li>';
+    }).join('');
+
+    var row = document.getElementById('optionChipRow');
+    row.innerHTML = ITEMS.map(function (it) {
+      return '<button type="button" class="option-chip" data-no="' + it.no + '" aria-pressed="false">' +
+             it.no + '. ' + esc(it.name) + ' <span class="cnt">' + itemCount(it.no) + '</span></button>';
+    }).join('');
+    row.querySelectorAll('.option-chip').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        var no = Number(chip.dataset.no);
+        view.activeNo = (view.activeNo === no) ? null : no;
+        row.querySelectorAll('.option-chip').forEach(function (c) {
+          c.setAttribute('aria-pressed', Number(c.dataset.no) === view.activeNo ? 'true' : 'false');
+        });
+        var it = ITEMS.filter(function (x) { return x.no === view.activeNo; })[0];
+        document.getElementById('optionActiveHint').textContent =
+          it ? ('"' + it.name + '" 대상 세대(' + itemCount(it.no) + ') 강조 중 · 다시 누르면 해제') : '';
+        pdfBtn.disabled = !view.activeNo;
+        applyView();
+      });
+    });
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c];
+    });
+  }
+
+  /* ---------- 골구도 ---------- */
+  function buildGrid(containerId, dong) {
+    var el = document.getElementById(containerId);
+    el.innerHTML = '';
+    D.grid.forEach(function (fl) {
+      var row = document.createElement('div');
+      row.className = 'floor-row';
+      var lbl = document.createElement('div');
+      lbl.className = 'floor-label';
+      lbl.textContent = fl.floor;
+      row.appendChild(lbl);
+
+      var byPos = {};
+      fl.positions.filter(function (p) { return p.dong === dong; })
+                  .forEach(function (p) { byPos[p.pos] = p; });
+
+      for (var pos = 1; pos <= 5; pos++) {
+        var p = byPos[pos];
+        var cell = document.createElement('div');
+        var u = (p && p.key) ? UNITS[p.key] : null;
+        if (!u) { cell.className = 'unit-cell empty'; row.appendChild(cell); continue; }
+        cell.dataset.key = p.key;
+        cell.dataset.label = u.label;
+        cell.tabIndex = 0;
+        paintCell(cell, u);
+        cell.addEventListener('click', function (e) { openModal(e.currentTarget.dataset.key); });
+        cell.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openModal(e.currentTarget.dataset.key); }
+        });
+        row.appendChild(cell);
+      }
+      el.appendChild(row);
+    });
+  }
+
+  function paintCell(cell, u) {
+    var o = optsOf(u);
+    cell.className = 'unit-cell ' + (o.length ? 'state-elec' : 'state-plain') + (isEdited(u) ? ' is-edited' : '');
+    cell.dataset.target = o.length ? '1' : '0';
+    var html = '<span class="ho">' + u.label + '</span>' +
+               '<span class="ty">' + esc(u.etype || u.type || '') + '</span>';
+    if (o.length) {
+      html += '<span class="enum-row">' + o.map(function (n) {
+        return '<span class="enum">' + n + '</span>';
+      }).join('') + '</span>';
+    }
+    cell.innerHTML = html;
+  }
+
+  function repaintCell(key) {
+    var cell = document.querySelector('.unit-cell[data-key="' + key + '"]');
+    if (cell) paintCell(cell, UNITS[key]);
+  }
+
+  function repaintAll() {
+    Object.keys(UNITS).forEach(repaintCell);
+    paintStats();
+    paintItems();
+    applyView();
+  }
+
+  /* ---------- 보기 상태 ---------- */
+  var view = { query: '', filter: 'all', activeNo: null };
+  var pdfBtn = document.getElementById('pdfBtn');
+
+  function applyView() {
+    document.querySelectorAll('.unit-cell:not(.empty)').forEach(function (c) {
+      var u = UNITS[c.dataset.key];
+      if (!u) return;
+      var o = optsOf(u);
+      var pass = (view.filter === 'all') ||
+                 (view.filter === 'target' && o.length > 0) ||
+                 (view.filter === 'plain' && o.length === 0);
+      c.style.display = pass ? '' : 'none';
+      if (!pass) { c.classList.remove('dim', 'opt-hit'); return; }
+
+      var hit = false, dim = false;
+      if (view.activeNo) { hit = o.indexOf(view.activeNo) >= 0; dim = !hit; }
+      if (!dim && view.query) dim = c.dataset.label.indexOf(view.query) < 0;
+      c.classList.toggle('opt-hit', hit);
+      c.classList.toggle('dim', dim);
+    });
+  }
+
+  document.getElementById('searchBox').addEventListener('input', function (e) {
+    view.query = e.target.value.trim();
+    applyView();
+  });
+  document.querySelectorAll('.filter-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.filter-btn').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
+      btn.setAttribute('aria-pressed', 'true');
+      view.filter = btn.dataset.filter;
+      applyView();
+    });
+  });
+
+  /* ---------- 세대 상세 ---------- */
+  var backdrop = document.getElementById('backdrop');
+  var modalBody = document.getElementById('modalBody');
+  var curKey = null, curTab = 'plan';
+
+  function openModal(key) {
+    if (!UNITS[key]) return;
+    curKey = key;
+    curTab = optsOf(UNITS[key]).length ? 'info' : 'plan';
+    renderModal();
+    backdrop.classList.add('open');
+  }
+
+  function renderModal() {
+    var u = UNITS[curKey];
+    if (!u) return;
+    var o = optsOf(u);
+    var ed = S.info(KIND, u.dong + u.ho);
+
+    var html = '<h3>' + u.dong + '동 ' + u.label + '</h3>' +
+               '<p class="sub">' + u.floor + ' · TYPE ' + esc(u.etype || u.type) + ' · ' + esc(u.gubun || '-') + '</p>';
+
+    html += '<div class="mtabs">' +
+      tab('info', '전기 옵션', o.length) +
+      tab('plan', '도면', null) +
+      (S.unlocked() ? tab('edit', '수정', null) : '') +
+      '</div><div id="mtabBody"></div>';
+
+    modalBody.innerHTML = html;
+    modalBody.querySelectorAll('.mtab').forEach(function (b) {
+      b.addEventListener('click', function () { curTab = b.dataset.tab; renderModal(); });
+    });
+    renderTab(u, o, ed);
+  }
+
+  function tab(id, label, n) {
+    return '<button type="button" class="mtab" data-tab="' + id + '" aria-pressed="' +
+           (curTab === id) + '">' + label + (n ? '<span class="n">' + n + '</span>' : '') + '</button>';
+  }
+
+  function renderTab(u, o, ed) {
+    var host = document.getElementById('mtabBody');
+    if (curTab === 'info') {
+      if (o.length) {
+        host.innerHTML = '<ul class="item-list">' + o.map(function (n) {
+          var it = ITEMS.filter(function (x) { return x.no === n; })[0] || { no: n, name: '(알 수 없는 번호)', desc: [] };
+          return '<li><span class="no">' + it.no + '</span><div class="body">' +
+                 '<div class="nm">' + esc(it.name) + '</div>' +
+                 (it.desc.length ? '<div class="ds">' + it.desc.map(esc).join('<br>') + '</div>' : '') +
+                 '</div></li>';
+        }).join('') + '</ul>' +
+        (ed ? '<p class="empty-note" style="margin-top:12px;">✏️ ' + esc(ed.at) +
+              (ed.who ? ' · ' + esc(ed.who) : '') + ' 수정됨</p>' : '');
+      } else {
+        host.innerHTML = '<p class="empty-note">이 세대는 전기공사 옵션 대상이 아닙니다.</p>';
+      }
+    } else if (curTab === 'plan') {
+      P.renderElectric(host, u, S);
+    } else {
+      U.renderElectricEdit(host, u, ITEMS, o, function () {
+        repaintCell(u.dong + u.ho);
+        paintStats(); paintItems(); applyView();
+        renderModal();
+      });
+    }
+  }
+
+  document.getElementById('closeBtn').addEventListener('click', function () {
+    backdrop.classList.remove('open'); curKey = null;
+  });
+  backdrop.addEventListener('click', function (e) {
+    if (e.target === backdrop) { backdrop.classList.remove('open'); curKey = null; }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      backdrop.classList.remove('open');
+      document.getElementById('lightbox').classList.remove('open');
+      document.getElementById('pinBackdrop').classList.remove('open');
+      curKey = null;
+    }
+  });
+
+  /* ---------- PDF ---------- */
+  function buildPrintHead() {
+    if (!view.activeNo) return;
+    var it = ITEMS.filter(function (x) { return x.no === view.activeNo; })[0];
+    var byDong = {}, hit = 0;
+    document.querySelectorAll('.unit-cell.opt-hit').forEach(function (c) {
+      if (c.style.display === 'none') return;
+      var u = UNITS[c.dataset.key];
+      if (!u) return;
+      (byDong[u.dong] = byDong[u.dong] || []).push(u);
+      hit++;
+    });
+    var t = new Date();
+    var stamp = t.getFullYear() + '.' + String(t.getMonth() + 1).padStart(2, '0') + '.' + String(t.getDate()).padStart(2, '0');
+
+    document.getElementById('printTitle').textContent =
+      '청량리역 요진 와이시티 — 전기공사 ' + it.no + '. ' + it.name + ' 대상 세대';
+    document.getElementById('printMeta').textContent =
+      '총 ' + hit + '세대 · ' + (it.desc.join(' / ') || '-') + ' · 출력일 ' + stamp;
+
+    var listHtml = '';
+    ['101', '102'].forEach(function (dong) {
+      var arr = byDong[dong];
+      if (!arr || !arr.length) return;
+      arr.sort(function (a, b) { return Number(a.ho) - Number(b.ho); });
+      listHtml += '<div><b>' + dong + '동</b> (' + arr.length + ') ' +
+                  arr.map(function (u) { return u.label + '(' + (u.etype || u.type) + ')'; }).join(', ') + '</div>';
+    });
+    if (!listHtml) listHtml = '<div>해당하는 세대가 없습니다.</div>';
+    listHtml += '<div class="print-legend" style="margin-top:6px;">' +
+      '<span class="box" style="background:#ffe9b0; border:1.6pt solid #000;"></span>' + it.name + ' 대상' +
+      '<span class="box" style="background:#fff; border:1px solid #ddd;"></span>해당 없음</div>';
+    document.getElementById('printList').innerHTML = listHtml;
+  }
+  pdfBtn.addEventListener('click', function () {
+    if (!view.activeNo) return;
+    buildPrintHead();
+    requestAnimationFrame(function () { setTimeout(function () { window.print(); }, 0); });
+  });
+  window.addEventListener('beforeprint', buildPrintHead);
+
+  /* ---------- 시작 ---------- */
+  document.getElementById('footNote').innerHTML =
+    D.electricNotes.map(function (n) { return '※ ' + esc(n); }).join('<br>') +
+    '<br>※ 세대 안의 숫자는 위 품목 번호입니다. 번호 칩을 누르면 그 공사 대상 세대만 강조되고, 그 상태로 PDF 출력이 됩니다.' +
+    '<br>※ 전기 도면은 저장소의 <b>images/전기/</b> 폴더에 넣으면 자동으로 나타납니다 (파일 이름 규칙은 설치 안내서를 봐주세요).';
+
+  buildGrid('grid101', '101');
+  buildGrid('grid102', '102');
+  paintStats();
+  paintItems();
+
+  U.initBar({
+    store: S,
+    kind: '전기',
+    onChanged: repaintAll,
+    onModeChange: function () { if (curKey) renderModal(); }
+  });
+})();
+</script>
+</body>
+</html>
