@@ -20,7 +20,7 @@
 
 - 확장자는 jpg, jpeg, png, webp 중 아무거나 됩니다.
 - 번호는 1번부터 차례로, 한 세대당 최대 8장까지 찾습니다.
-  (더 필요하면 config.js 의 electricPlanMax 숫자를 올려주세요)
+  (더 필요하면 option-config.js 의 electricPlanMax 숫자를 올려주세요)
 - 중간 번호가 비어 있어도 있는 것만 보여줍니다.
 
 ## 탭 이름

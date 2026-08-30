@@ -24,7 +24,7 @@
       if (bar) {
         bar.hidden = false;
         bar.innerHTML = '<b>지금은 보기 전용입니다.</b> 표는 정상으로 보이지만 수정은 저장되지 않습니다.<br>' +
-          '수정까지 쓰시려면 <code>config.js</code> 파일을 열어서 <code>apiUrl</code> 에 Apps Script 주소를 붙여넣어 주세요. ' +
+          '수정까지 쓰시려면 <code>settings.js</code> 파일을 열어서 <code>apiUrl</code> 에 Apps Script 주소를 붙여넣어 주세요. ' +
           '(설치 안내서 참고 — 이 파일 하나만 고치면 되고, 다음에 새 버전을 받아도 그대로 남습니다.)';
       }
       return;
