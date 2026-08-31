@@ -8,7 +8,7 @@
    주소를 안 넣어도 표는 그냥 열립니다. "수정"만 안 됩니다.
    ───────────────────────────────────────────────────────────── */
 window.WYC_CONFIG = {
-  apiUrl: '여기에_APPS_SCRIPT_주소를_붙여넣으세요',
+  apiUrl: 'https://script.google.com/macros/s/AKfycbwER6M7cLCS2CDBrxkMpuhYEvnScpt5OSIDJfjkbXy28e7eGTsQzhmTPq2dSjfunNEp/exec',
 
   electricPlanDir: 'images/전기/',   // 전기 도면 폴더
   electricPlanMax: 8                 // 한 세대에서 찾아볼 도면 장수
