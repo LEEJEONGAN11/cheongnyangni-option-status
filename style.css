@@ -316,7 +316,9 @@ body.editing .unit-cell { cursor: crosshair; }
   display:inline-block; width:7px; height:7px; border-radius:50%;
   background: var(--info); vertical-align: middle; margin-left:4px;
 }
-.unit-cell.is-edited { box-shadow: inset 0 0 0 2px var(--info); }
+/* 수정한 세대라도 격자에는 테두리를 넣지 않습니다.
+   무엇을 고쳤는지는 세대를 눌러 열리는 상세, 또는 '수정 이력'에서 봅니다. */
+.unit-cell.is-edited { /* 표시 없음 */ }
 
 .edit-panel {
   border:1px solid var(--gridline); border-radius:12px; background: var(--page-plane);
