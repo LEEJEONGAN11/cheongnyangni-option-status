@@ -70,8 +70,7 @@
     srv.addEventListener('click', function () {
       if (!S.apiReady) return;
       if (!S.online) { S.load(true).then(function () { paintBar(); if (opts.onChanged) opts.onChanged(); }); return; }
-      if (S.unlocked()) showHistory();
-      else S.toast('수정 이력은 잠금을 푼 뒤에 볼 수 있습니다');
+      showHistory();   // 잠금 없이 볼 수 있습니다
     });
 
     if (edit) edit.addEventListener('click', function () {
@@ -150,31 +149,102 @@
     el('whoIn').addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
   }
 
-  /* ───────── 수정 이력 ───────── */
+  /* ───────── 수정 이력 (비밀번호 없이 볼 수 있습니다) ─────────
+     서버가 주는 "지금 값"(state)과 사이트에 내장된 원본(data.js)을
+     비교해서, 세대마다 무엇이 더해지고 빠졌는지 보여줍니다. */
+
+  var STATE_LABEL = { option: '옵션 계약', nooption: '계약완료 · 옵션 미선택', none: '미계약' };
+
+  function fmtAt(s) {
+    var d = new Date(s);
+    if (isNaN(d.getTime())) return String(s || '');
+    function p(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+           ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  function unitTitle(u, key) {
+    if (!u) return key;
+    return u.dong + '동 ' + (u.label || (u.ho + '호'));
+  }
+
+  function buildHistory() {
+    var D = window.WYC || {};
+    var UNITS = D.units || {};
+    var itemName = {};
+    (D.electricItems || []).forEach(function (it) { itemName[it.no] = it.name; });
+
+    var out = [];
+    Object.keys(S.changes).forEach(function (ck) {
+      var i = ck.indexOf('|');
+      var kind = ck.slice(0, i), key = ck.slice(i + 1);
+      var rec = S.changes[ck] || {};
+      var cur = rec.val || {};
+      var u = UNITS[key];
+      var lines = [];
+
+      if (kind === '계약') {
+        var oState = (u && u.state) || 'none';
+        var nState = cur.state || oState;
+        var oOpts = (u && u.opts) || [];
+        var nOpts = cur.opts || oOpts;
+        if (oState !== nState) {
+          lines.push({ t: 'state', a: STATE_LABEL[oState] || oState, b: STATE_LABEL[nState] || nState });
+        }
+        nOpts.forEach(function (x) { if (oOpts.indexOf(x) < 0) lines.push({ t: 'add', v: x }); });
+        oOpts.forEach(function (x) { if (nOpts.indexOf(x) < 0) lines.push({ t: 'del', v: x }); });
+        out.push({ tag: '계약 옵션', unit: unitTitle(u, key), at: rec.at, who: rec.who, lines: lines });
+
+      } else if (kind === '전기') {
+        var oE = (u && u.eopts) || [];
+        var nE = cur.opts || oE;
+        var label = function (no) { return no + '. ' + (itemName[no] || ('품목 ' + no)); };
+        nE.forEach(function (no) { if (oE.indexOf(no) < 0) lines.push({ t: 'add', v: label(no) }); });
+        oE.forEach(function (no) { if (nE.indexOf(no) < 0) lines.push({ t: 'del', v: label(no) }); });
+        out.push({ tag: '전기공사', unit: unitTitle(u, key), at: rec.at, who: rec.who, lines: lines });
+
+      } else if (kind === '도면') {
+        (cur.names || []).forEach(function (nm, idx) {
+          if (nm) lines.push({ t: 'name', v: '도면 ' + (idx + 1) + ' → “' + nm + '”' });
+        });
+        out.push({ tag: '도면 이름', unit: key + ' 타입', at: rec.at, who: rec.who, lines: lines });
+      }
+    });
+
+    out.sort(function (a, b) {
+      var ta = new Date(a.at).getTime() || 0, tb = new Date(b.at).getTime() || 0;
+      return tb - ta;   // 최근 것이 위로
+    });
+    return out;
+  }
 
   function showHistory() {
     var back = el('pinBackdrop'), body = el('pinBody');
-    body.innerHTML = '<h3>수정 이력</h3><p class="sub">불러오는 중…</p>';
     back.classList.add('open');
-    S.history().then(function (rows) {
-      if (!rows.length) {
-        body.innerHTML = '<h3>수정 이력</h3><p class="empty-note">아직 수정한 내역이 없습니다.</p>';
-        return;
-      }
-      body.innerHTML = '<h3>수정 이력</h3><p class="sub">최근 ' + rows.length + '건</p>' +
-        '<div class="hist"><table><thead><tr><th>시각</th><th>구분</th><th>대상</th><th>바뀐 값</th><th>사람</th></tr></thead><tbody>' +
-        rows.map(function (r) {
-          return '<tr><td>' + esc(r.at) + '</td><td>' + esc(r.kind) + '</td><td>' + esc(r.key) +
-                 '</td><td class="v">' + esc(shorten(r.after)) + '</td><td>' + esc(r.who || '-') + '</td></tr>';
-        }).join('') + '</tbody></table></div>';
-    }).catch(function (err) {
-      body.innerHTML = '<h3>수정 이력</h3><p class="empty-note">' + esc(err.message) + '</p>';
-    });
-  }
 
-  function shorten(s) {
-    s = String(s || '');
-    return s.length > 90 ? s.slice(0, 90) + '…' : s;
+    var list = buildHistory();
+    if (!list.length) {
+      body.innerHTML = '<h3>수정 이력</h3><p class="empty-note">아직 원본에서 고친 세대가 없습니다.</p>';
+      return;
+    }
+
+    body.innerHTML = '<h3>수정 이력</h3>' +
+      '<p class="sub">원본과 지금 값을 비교한 결과입니다 · 모두 ' + list.length + '건</p>' +
+      '<div class="hist">' + list.map(function (e) {
+        var inner = e.lines.length
+          ? '<ul class="hist-ch">' + e.lines.map(function (ln) {
+              if (ln.t === 'state') return '<li class="c-state">계약 상태 <span>' + esc(ln.a) + '</span> → <b>' + esc(ln.b) + '</b></li>';
+              if (ln.t === 'add') return '<li class="c-add">＋ ' + esc(ln.v) + '</li>';
+              if (ln.t === 'del') return '<li class="c-del">− ' + esc(ln.v) + '</li>';
+              return '<li class="c-name">' + esc(ln.v) + '</li>';
+            }).join('') + '</ul>'
+          : '<p class="hist-none">바뀐 항목이 없습니다 (원본과 같아졌습니다).</p>';
+        return '<div class="hist-card">' +
+          '<div class="hist-top"><b>' + esc(e.unit) + '</b><span class="hist-tag">' + esc(e.tag) + '</span></div>' +
+          inner +
+          '<div class="hist-when">' + esc(fmtAt(e.at)) + (e.who ? ' · ' + esc(e.who) : '') + '</div>' +
+          '</div>';
+      }).join('') + '</div>';
   }
 
   /* ───────── 저장 버튼 공통 ───────── */

@@ -410,11 +410,22 @@ body.editing .unit-cell { cursor: crosshair; }
 .pin-err { color:#a11; font-size:12.5px; margin-top:9px; font-weight:700; min-height:16px; }
 
 /* --- 수정 이력 --- */
-.hist { max-height: 46vh; overflow-y:auto; }
-.hist table { width:100%; border-collapse:collapse; font-size:12px; }
-.hist th, .hist td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--gridline); vertical-align:top; }
-.hist th { color: var(--text-muted); font-size:11px; position:sticky; top:0; background: var(--surface-1); }
-.hist td.v { color: var(--text-secondary); word-break:break-all; }
+.hist { max-height: 56vh; overflow-y:auto; margin: 2px -2px 0; padding: 0 2px; }
+.hist-card { border:1px solid var(--gridline); border-radius:12px; background: var(--page-plane); padding:11px 13px; margin-bottom:10px; }
+.hist-card:last-child { margin-bottom:0; }
+.hist-top { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.hist-top b { font-size:15px; font-weight:800; letter-spacing:-0.01em; }
+.hist-tag { font-size:11px; font-weight:700; color: var(--text-muted); background: var(--neutral-bg); padding:2px 8px; border-radius:999px; }
+.hist-ch { list-style:none; margin:9px 0 0; padding:0; display:flex; flex-direction:column; gap:5px; }
+.hist-ch li { font-size:13px; font-weight:600; line-height:1.45; }
+.hist-ch .c-add { color: var(--good-text); }
+.hist-ch .c-del { color:#a11; }
+.hist-ch .c-state { color: var(--text-secondary); }
+.hist-ch .c-state span { text-decoration: line-through; color: var(--text-muted); }
+.hist-ch .c-state b { color: var(--info-text); font-weight:800; }
+.hist-ch .c-name { color: var(--text-secondary); }
+.hist-none { font-size:12.5px; color: var(--text-muted); margin:9px 0 0; }
+.hist-when { font-size:11px; color: var(--text-muted); margin-top:10px; font-weight:600; }
 
 @media print {
   .navbar, .sysbar, .wyc-toast, .edit-panel { display:none !important; }
