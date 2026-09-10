@@ -265,6 +265,11 @@
 
   footer.note { margin-top: 20px; font-size: 11.5px; color: var(--text-muted); line-height:1.6; }
 
+  /* 제작자 표기 (눈에 크게 띄지 않게) */
+  .made-by { margin-top: 22px; text-align:center; font-size: 11px; color: var(--text-muted); opacity:.75; line-height:1.7; }
+  .made-by a { color: inherit; text-decoration: none; }
+  .made-by a:hover { text-decoration: underline; }
+
 /* ═══════════════ 여기부터 추가 (수정 기능 · 탭 · 전기 도면) ═══════════════ */
 
 /* --- 페이지 위쪽 이동 줄 --- */

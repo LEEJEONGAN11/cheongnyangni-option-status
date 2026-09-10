@@ -73,7 +73,7 @@
     </div>
   </div>
 
-  <footer class="note" id="footNote"></footer>
+  <div class="made-by">제작 이정안 사원 · 수정 문의 <a href="tel:01080306615">010-8030-6615</a></div>
 
   <div class="backdrop" id="backdrop">
     <div class="modal modal-wrap" id="modal" role="dialog" aria-modal="true">
@@ -395,11 +395,6 @@
   window.addEventListener('beforeprint', buildPrintHead);
 
   /* ---------- 시작 ---------- */
-  document.getElementById('footNote').innerHTML =
-    D.electricNotes.map(function (n) { return '※ ' + esc(n); }).join('<br>') +
-    '<br>※ 세대 안의 숫자는 위 품목 번호입니다. 번호 칩을 누르면 그 공사 대상 세대만 강조되고, 그 상태로 PDF 출력이 됩니다.' +
-    '<br>※ 전기 도면은 저장소의 <b>images/전기/</b> 폴더에 넣으면 자동으로 나타납니다 (파일 이름 규칙은 설치 안내서를 봐주세요).';
-
   buildGrid('grid101', '101');
   buildGrid('grid102', '102');
   paintStats();
