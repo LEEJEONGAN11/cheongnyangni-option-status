@@ -68,12 +68,99 @@
   .option-panel-hint { font-size: 12px; color: var(--accent-text); font-weight:700; }
   .option-chip-row { display:flex; gap:8px; flex-wrap:wrap; }
   .option-chip {
-    padding: 7px 13px; border-radius: 999px; border: 1px solid var(--border); background: var(--page-plane);
+    display:inline-flex; align-items:center; gap:7px;
+    padding: 7px 9px 7px 13px; border-radius: 999px; border: 1px solid var(--border); background: var(--page-plane);
     color: var(--text-secondary); font-size: 12.5px; cursor:pointer; font-weight:600;
+    transition: background .12s ease, border-color .12s ease, color .12s ease;
   }
-  .option-chip .cnt { color: var(--text-muted); font-weight:500; }
+  .option-chip:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  .option-chip .cnt {
+    color: var(--text-muted); font-weight:700; font-size:11px;
+    background: var(--neutral-bg); padding:2px 7px; border-radius:999px;
+  }
   .option-chip[aria-pressed="true"] { background: var(--accent); color: #1a1200; border-color: var(--accent); }
-  .option-chip[aria-pressed="true"] .cnt { color: #1a1200; opacity: .75; }
+  .option-chip[aria-pressed="true"] .cnt { background: rgba(0,0,0,.14); color: #1a1200; }
+  .option-chip.is-empty { opacity:.4; }
+  .option-chip.is-empty .cnt { text-decoration: line-through; }
+
+  /* ── 옵션 계약 현황: 접을 수 있는 옵션 패널 + 여러 개 선택 ── */
+  .option-panel.panel-collapsible { padding: 0; }
+  .option-panel.panel-collapsible .option-panel-head { padding: 11px 14px; margin-bottom: 0; }
+  .option-panel-head .spacer { flex: 1; min-width: 10px; }
+  .opt-toggle {
+    display:inline-flex; align-items:center; gap:8px; border:0; background:none; padding:0;
+    font-family:inherit; font-size:13px; font-weight:700; color: var(--text-primary); cursor:pointer;
+  }
+  .opt-caret {
+    width:7px; height:7px; border-right:2px solid var(--text-muted); border-bottom:2px solid var(--text-muted);
+    transform:rotate(45deg); transition: transform .18s ease; flex:none;
+  }
+  .option-panel.collapsed .opt-caret { transform: rotate(-45deg); }
+  .opt-sel-badge {
+    font-size:11px; font-weight:800; color:#fff; background: var(--accent-text);
+    padding:2px 8px; border-radius:999px;
+  }
+  .opt-clear {
+    border:1px solid var(--border); background: var(--page-plane); color: var(--text-secondary);
+    font-family:inherit; font-size:11.5px; font-weight:700; padding:6px 11px; border-radius:999px; cursor:pointer;
+  }
+  .opt-clear:hover { background: var(--neutral-bg); }
+  .option-panel-body { border-top:1px solid var(--gridline); padding: 12px 14px 14px; }
+  .option-panel.collapsed .option-panel-body { display:none; }
+  .opt-multi-tip { margin: 11px 0 0; font-size:11.5px; color: var(--text-muted); }
+  .opt-multi-tip b { color: var(--text-secondary); font-weight:700; }
+
+  /* ── 옵션 계약 현황: 헤더 카드(제목+통계+비율 막대) ── */
+  .hero {
+    background: var(--surface-1); border:1px solid var(--border); border-radius: 16px;
+    padding: 20px 22px; margin-bottom: 14px;
+    box-shadow: 0 1px 2px rgba(11,11,11,.04), 0 10px 28px -18px rgba(11,11,11,.22);
+  }
+  .hero-top { display:flex; align-items:flex-start; justify-content:space-between; gap:22px; flex-wrap:wrap; }
+  .hero-stats { display:flex; flex-wrap:wrap; }
+  .hs { display:flex; flex-direction:column; gap:3px; padding: 2px 18px; border-left:1px solid var(--gridline); }
+  .hs:first-child { padding-left:0; border-left:0; }
+  .hs-label { font-size:11px; color: var(--text-muted); font-weight:600; white-space:nowrap; }
+  .hs-num { font-size:21px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:-.01em; }
+  .hs.good .hs-num { color: var(--good-text); }
+  .hs.info .hs-num { color: var(--info-text); }
+  .prop-wrap { margin-top:16px; }
+  .prop { display:flex; height:8px; border-radius:999px; overflow:hidden; background: var(--neutral-bg); }
+  .prop i { display:block; height:100%; transition: width .25s ease; }
+  .prop i.good { background: var(--good); }
+  .prop i.info { background: var(--info); }
+  .prop i.none { background: var(--neutral-text); }
+  .prop-legend { display:flex; gap:16px; flex-wrap:wrap; margin-top:9px; font-size:11.5px; color: var(--text-muted); }
+  .prop-legend b { color: var(--text-secondary); font-weight:700; }
+  .prop-legend .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:-1px; }
+  .prop-legend .dot.good { background: var(--good); }
+  .prop-legend .dot.info { background: var(--info); }
+  .prop-legend .dot.none { background: var(--neutral-text); }
+  @media (max-width:640px) {
+    .hero { padding:16px 14px; }
+    .hero-stats { width:100%; gap:12px 18px; }
+    .hs { border-left:0; padding: 0; flex: 1 1 40%; }
+  }
+
+  /* ── 옵션 계약 현황: 검색·필터 툴바 ── */
+  .toolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin: 14px 0 16px; }
+  .toolbar .tb-search {
+    flex:1; min-width:190px; display:flex; align-items:center; gap:8px;
+    padding: 9px 12px; border-radius: 10px; border:1px solid var(--border); background: var(--surface-1);
+  }
+  .toolbar .tb-search svg { flex:none; color: var(--text-muted); }
+  .toolbar .tb-search input {
+    flex:1; min-width:0; border:0; background:transparent; font-size:13px; color: var(--text-primary); font-family:inherit;
+  }
+  .toolbar .tb-search input::placeholder { color: var(--text-muted); }
+  .toolbar .tb-search:focus-within { border-color: var(--info); box-shadow: 0 0 0 3px var(--info-bg); }
+  .toolbar .seg { display:inline-flex; padding:3px; gap:2px; border-radius:10px; background: var(--page-plane); border:1px solid var(--border); flex-wrap:wrap; }
+  .toolbar .seg .filter-btn {
+    appearance:none; font-family:inherit; cursor:pointer; border:0; background:transparent;
+    padding:7px 12px; border-radius:7px; font-size:12px; font-weight:700; color: var(--text-secondary); white-space:nowrap;
+  }
+  .toolbar .seg .filter-btn[aria-pressed="true"] { background: var(--surface-1); color: var(--text-primary); box-shadow: 0 1px 2px rgba(11,11,11,.08); }
+  @media (max-width:640px) { .toolbar .tb-search input { font-size: 16px; } } /* iOS 자동 확대 방지 */
 
   .buildings { display:grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   @media (max-width: 760px) { .buildings { grid-template-columns: 1fr; } }
@@ -139,7 +226,8 @@
 
     /* 인쇄에 불필요한 UI 숨기기 */
     header.top, .stat-row, .legend, .controls, .option-panel,
-    .backdrop, .lightbox-backdrop, footer.note { display: none !important; }
+    .backdrop, .lightbox-backdrop, footer.note,
+    .hero, .toolbar { display: none !important; }
 
     .viz-root { max-width: none; padding: 0; margin: 0; }
 

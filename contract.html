@@ -19,18 +19,40 @@
 
   <div class="sysbar" id="sysBar" hidden></div>
 
-  <header class="top">
-    <div>
-      <h1>청량리역 요진 와이시티 — 호수별 옵션 계약 현황</h1>
-      <p class="subtitle">골구도 기준 · 2026-07-07 데이터 · 정리일 2026-08-19</p>
+  <header class="hero">
+    <div class="hero-top">
+      <div class="hero-title">
+        <h1>호수별 옵션 계약 현황</h1>
+        <p class="subtitle">청량리역 요진 와이시티 · 골구도 기준 · 2026-07-07 데이터 · 정리일 2026-08-19</p>
+      </div>
+      <div class="hero-stats">
+        <div class="hs"><span class="hs-label">전체</span><span class="hs-num" id="statTotal">-</span></div>
+        <div class="hs good"><span class="hs-label">옵션 계약</span><span class="hs-num" id="statOption">-</span></div>
+        <div class="hs info"><span class="hs-label">계약완료 · 옵션無</span><span class="hs-num" id="statNooption">-</span></div>
+        <div class="hs"><span class="hs-label">미계약</span><span class="hs-num" id="statNone">-</span></div>
+      </div>
+    </div>
+    <div class="prop-wrap">
+      <div class="prop"><i class="good" id="propGood"></i><i class="info" id="propInfo"></i><i class="none" id="propNone"></i></div>
+      <div class="prop-legend">
+        <span><i class="dot good"></i>옵션 계약 <b id="propGoodTxt">-</b></span>
+        <span><i class="dot info"></i>계약완료 · 옵션無 <b id="propInfoTxt">-</b></span>
+        <span><i class="dot none"></i>미계약 <b id="propNoneTxt">-</b></span>
+      </div>
     </div>
   </header>
 
-  <div class="stat-row">
-    <div class="stat-tile"><div class="label">전체 세대</div><div class="value" id="statTotal">-</div></div>
-    <div class="stat-tile good"><div class="label">옵션 계약</div><div class="value" id="statOption">-</div></div>
-    <div class="stat-tile info"><div class="label">계약완료 · 옵션無</div><div class="value" id="statNooption">-</div></div>
-    <div class="stat-tile"><div class="label">미계약</div><div class="value" id="statNone">-</div></div>
+  <div class="toolbar">
+    <label class="tb-search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" id="searchBox" placeholder="호수로 검색 (예: 1902, 501)">
+    </label>
+    <div class="seg">
+      <button class="filter-btn" data-filter="all" aria-pressed="true" type="button">전체</button>
+      <button class="filter-btn" data-filter="option" aria-pressed="false" type="button">옵션 계약만</button>
+      <button class="filter-btn" data-filter="nooption" aria-pressed="false" type="button">계약완료·옵션無</button>
+      <button class="filter-btn" data-filter="none" aria-pressed="false" type="button">미계약만</button>
+    </div>
   </div>
 
   <div class="legend">
@@ -40,21 +62,21 @@
     <span class="chip">호수를 클릭하면 상세 정보가 열려요</span>
   </div>
 
-  <div class="controls">
-    <input type="text" id="searchBox" placeholder="호수로 검색 (예: 1902, 501)">
-    <button class="filter-btn" data-filter="all" aria-pressed="true" type="button">전체</button>
-    <button class="filter-btn" data-filter="option" aria-pressed="false" type="button">옵션 계약만</button>
-    <button class="filter-btn" data-filter="nooption" aria-pressed="false" type="button">계약완료·옵션無</button>
-    <button class="filter-btn" data-filter="none" aria-pressed="false" type="button">미계약만</button>
-  </div>
-
-  <div class="option-panel">
+  <div class="option-panel panel-collapsible" id="optionPanel">
     <div class="option-panel-head">
-      <span class="option-panel-title">옵션 항목별로 보기</span>
+      <button type="button" class="opt-toggle" id="optToggle" aria-expanded="true" aria-controls="optionPanelBody">
+        <span class="opt-caret" aria-hidden="true"></span>옵션 항목별로 보기
+      </button>
+      <span class="opt-sel-badge" id="optSelBadge" hidden></span>
       <span class="option-panel-hint" id="optionActiveHint"></span>
-      <button type="button" id="pdfBtn" class="pdf-btn" disabled>📄 PDF로 출력</button>
+      <span class="spacer"></span>
+      <button type="button" class="opt-clear" id="optClearBtn" hidden>선택 해제</button>
+      <button type="button" id="pdfBtn" class="pdf-btn" disabled title="먼저 옵션 항목을 선택해주세요">📄 PDF로 출력</button>
     </div>
-    <div class="option-chip-row" id="optionChipRow"></div>
+    <div class="option-panel-body" id="optionPanelBody">
+      <div class="option-chip-row" id="optionChipRow"></div>
+      <p class="opt-multi-tip">항목을 여러 개 누르면 <b>모두 계약한 세대</b>만 강조됩니다.</p>
+    </div>
   </div>
 
   <!-- 인쇄(PDF) 전용 머리말 — 화면에는 보이지 않습니다 -->
@@ -134,42 +156,111 @@
   function paintStats() {
     var n = { option: 0, nooption: 0, none: 0 };
     allUnits.forEach(function (u) { n[nowOf(u).state]++; });
-    document.getElementById('statTotal').textContent = allUnits.length + '세대';
+    var total = allUnits.length;
+    document.getElementById('statTotal').textContent = total + '세대';
     document.getElementById('statOption').textContent = n.option + '세대';
     document.getElementById('statNooption').textContent = n.nooption + '세대';
     document.getElementById('statNone').textContent = n.none + '세대';
+
+    function pct(v) { return total ? (v / total * 100) : 0; }
+    document.getElementById('propGood').style.width = pct(n.option) + '%';
+    document.getElementById('propInfo').style.width = pct(n.nooption) + '%';
+    document.getElementById('propNone').style.width = pct(n.none) + '%';
+    document.getElementById('propGoodTxt').textContent = n.option + '세대 (' + Math.round(pct(n.option)) + '%)';
+    document.getElementById('propInfoTxt').textContent = n.nooption + '세대';
+    document.getElementById('propNoneTxt').textContent = n.none + '세대';
   }
 
-  /* ---------- 옵션 칩 ---------- */
+  /* ---------- 옵션 칩 (여러 개 선택 가능) ---------- */
   function optionCount(name) {
     var n = 0;
     allUnits.forEach(function (u) { if (nowOf(u).opts.indexOf(name) >= 0) n++; });
     return n;
   }
 
+  /* 지금 선택된 항목들에 name 을 더했을 때 몇 세대가 남는지 (칩이 "선택해도 소용없음"인지 표시용) */
+  function comboCount(name) {
+    var sel = view.activeOptions;
+    var n = 0;
+    allUnits.forEach(function (u) {
+      var opts = nowOf(u).opts;
+      for (var i = 0; i < sel.length; i++) { if (sel[i] !== name && opts.indexOf(sel[i]) < 0) return; }
+      if (opts.indexOf(name) >= 0) n++;
+    });
+    return n;
+  }
+
+  function refreshChipStates() {
+    var sel = view.activeOptions;
+    document.querySelectorAll('.option-chip').forEach(function (c) {
+      var nm = c.dataset.option;
+      var on = sel.indexOf(nm) >= 0;
+      c.setAttribute('aria-pressed', on ? 'true' : 'false');
+      c.classList.toggle('is-empty', !on && sel.length > 0 && comboCount(nm) === 0);
+    });
+  }
+
+  function updateOptionHead(shownHits) {
+    var sel = view.activeOptions;
+    var hintEl = document.getElementById('optionActiveHint');
+    var badgeEl = document.getElementById('optSelBadge');
+    var clearBtn = document.getElementById('optClearBtn');
+    if (!sel.length) {
+      hintEl.textContent = '';
+      badgeEl.hidden = true;
+      clearBtn.hidden = true;
+      pdfBtn.disabled = true;
+      pdfBtn.title = '먼저 옵션 항목을 선택해주세요';
+      return;
+    }
+    badgeEl.hidden = false;
+    badgeEl.textContent = sel.length + '개 선택';
+    clearBtn.hidden = false;
+    var label = '"' + sel.join('" + "') + '"';
+    hintEl.textContent = (sel.length === 1 ? (label + ' 있는 세대 ') : (label + ' 모두 있는 세대 ')) + shownHits + '곳';
+    pdfBtn.disabled = false;
+    pdfBtn.title = label + ' 골구도를 PDF로 출력';
+  }
+
   function paintChips() {
     var row = document.getElementById('optionChipRow');
     row.innerHTML = OPTION_ITEMS.map(function (nm) {
       return '<button type="button" class="option-chip" data-option="' + esc(nm) + '" aria-pressed="' +
-             (view.activeOption === nm) + '">' + esc(nm) +
+             (view.activeOptions.indexOf(nm) >= 0) + '">' + esc(nm) +
              ' <span class="cnt">' + optionCount(nm) + '</span></button>';
     }).join('');
     row.querySelectorAll('.option-chip').forEach(function (chip) {
       chip.addEventListener('click', function () {
         var name = chip.dataset.option;
-        view.activeOption = (view.activeOption === name) ? null : name;
-        row.querySelectorAll('.option-chip').forEach(function (c) {
-          c.setAttribute('aria-pressed', c.dataset.option === view.activeOption ? 'true' : 'false');
-        });
-        document.getElementById('optionActiveHint').textContent = view.activeOption
-          ? ('"' + view.activeOption + '" 선택 세대(' + optionCount(view.activeOption) + ') 강조 중 · 다시 누르면 해제')
-          : '';
-        pdfBtn.disabled = !view.activeOption;
-        pdfBtn.title = view.activeOption ? ('"' + view.activeOption + '" 골구도를 PDF로 출력') : '먼저 옵션 항목을 선택해주세요';
+        var i = view.activeOptions.indexOf(name);
+        if (i >= 0) view.activeOptions.splice(i, 1); else view.activeOptions.push(name);
+        refreshChipStates();
         applyView();
       });
     });
+    refreshChipStates();
   }
+
+  document.getElementById('optClearBtn').addEventListener('click', function () {
+    view.activeOptions = [];
+    refreshChipStates();
+    applyView();
+  });
+
+  /* ---------- 옵션 패널 접기/펼치기 ---------- */
+  (function () {
+    var panel = document.getElementById('optionPanel');
+    var toggle = document.getElementById('optToggle');
+    function setOpen(open) {
+      panel.classList.toggle('collapsed', !open);
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      try { localStorage.setItem('wyc_contract_optpanel', open ? '1' : '0'); } catch (e) {}
+    }
+    toggle.addEventListener('click', function () { setOpen(panel.classList.contains('collapsed')); });
+    var saved = null;
+    try { saved = localStorage.getItem('wyc_contract_optpanel'); } catch (e) {}
+    setOpen(saved !== '0');
+  })();
 
   /* ---------- 골구도 ---------- */
   function buildGrid(containerId, dong) {
@@ -224,10 +315,12 @@
   }
 
   /* ---------- 보기 상태 ---------- */
-  var view = { query: '', stateFilter: 'all', activeOption: null };
+  var view = { query: '', stateFilter: 'all', activeOptions: [] };
   var pdfBtn = document.getElementById('pdfBtn');
 
   function applyView() {
+    var sel = view.activeOptions;
+    var shownHits = 0;
     document.querySelectorAll('.unit-cell:not(.empty)').forEach(function (c) {
       var u = UNITS[c.dataset.key];
       if (!u) return;
@@ -237,11 +330,16 @@
       if (!pass) { c.classList.remove('dim', 'opt-hit'); return; }
 
       var hit = false, dim = false;
-      if (view.activeOption) { hit = cur.opts.indexOf(view.activeOption) >= 0; dim = !hit; }
+      if (sel.length) {
+        hit = sel.every(function (nm) { return cur.opts.indexOf(nm) >= 0; });
+        dim = !hit;
+        if (hit) shownHits++;
+      }
       if (!dim && view.query) dim = c.dataset.label.indexOf(view.query) < 0;
       c.classList.toggle('opt-hit', hit);
       c.classList.toggle('dim', dim);
     });
+    updateOptionHead(shownHits);
   }
 
   document.getElementById('searchBox').addEventListener('input', function (e) {
@@ -342,8 +440,9 @@
 
   /* ---------- 옵션별 골구도 PDF 출력 ---------- */
   function buildPrintHead() {
-    var opt = view.activeOption;
-    if (!opt) return;
+    var sel = view.activeOptions;
+    if (!sel.length) return;
+    var label = sel.join(' + ');
     var byDong = {}, hitCount = 0;
     document.querySelectorAll('.unit-cell.opt-hit').forEach(function (c) {
       if (c.style.display === 'none') return;
@@ -358,7 +457,7 @@
     var filterLabel = view.stateFilter === 'all' ? '' :
       ' · 필터: ' + ({ option: '옵션 계약만', nooption: '계약완료·옵션無', none: '미계약만' }[view.stateFilter] || '');
 
-    document.getElementById('printTitle').textContent = '청량리역 요진 와이시티 — ' + opt + ' 대상 세대';
+    document.getElementById('printTitle').textContent = '청량리역 요진 와이시티 — ' + label + ' 대상 세대';
     document.getElementById('printMeta').textContent =
       '총 ' + hitCount + '세대' + filterLabel + ' · 골구도 기준 · 출력일 ' + stamp;
 
@@ -372,18 +471,17 @@
     });
     if (!listHtml) listHtml = '<div>해당하는 세대가 없습니다.</div>';
     listHtml += '<div class="print-legend" style="margin-top:6px;">' +
-      '<span class="box" style="background:#ffe9b0; border:1.6pt solid #000;"></span>' + opt + ' 대상' +
+      '<span class="box" style="background:#ffe9b0; border:1.6pt solid #000;"></span>' + label + ' 대상(전부)' +
       '<span class="box" style="background:#fff; border:1px solid #ddd;"></span>해당 없음</div>';
     document.getElementById('printList').innerHTML = listHtml;
   }
 
   pdfBtn.addEventListener('click', function () {
-    if (!view.activeOption) return;
+    if (!view.activeOptions.length) return;
     buildPrintHead();
     requestAnimationFrame(function () { setTimeout(function () { window.print(); }, 0); });
   });
   window.addEventListener('beforeprint', buildPrintHead);
-  pdfBtn.title = '먼저 옵션 항목을 선택해주세요';
 
   /* ---------- 시작 ---------- */
   buildGrid('grid101', '101');
