@@ -33,14 +33,22 @@
     <div class="stat-tile"><div class="label">공사 품목</div><div class="value" id="statItems">-</div></div>
   </div>
 
-  <div class="option-panel">
+  <div class="option-panel panel-collapsible" id="optionPanel">
     <div class="option-panel-head">
-      <span class="option-panel-title">공사 품목 (번호를 누르면 그 공사가 있는 세대만 강조됩니다)</span>
+      <button type="button" class="opt-toggle" id="optToggle" aria-expanded="true" aria-controls="optionPanelBody">
+        <span class="opt-caret" aria-hidden="true"></span>공사 품목별로 보기
+      </button>
+      <span class="opt-sel-badge" id="optSelBadge" hidden></span>
       <span class="option-panel-hint" id="optionActiveHint"></span>
-      <button type="button" id="pdfBtn" class="pdf-btn" disabled>📄 PDF로 출력</button>
+      <span class="spacer"></span>
+      <button type="button" class="opt-clear" id="optClearBtn" hidden>선택 해제</button>
+      <button type="button" id="pdfBtn" class="pdf-btn" disabled title="먼저 공사 품목을 선택해주세요">📄 PDF로 출력</button>
     </div>
-    <div class="option-chip-row" id="optionChipRow"></div>
-    <ul class="item-list" id="itemList" style="margin-top:12px;"></ul>
+    <div class="option-panel-body" id="optionPanelBody">
+      <div class="option-chip-row" id="optionChipRow"></div>
+      <p class="opt-multi-tip">번호를 여러 개 누르면 <b>모두 시공하는 세대</b>만 강조됩니다.</p>
+      <ul class="item-list" id="itemList" style="margin-top:12px;"></ul>
+    </div>
   </div>
 
   <div class="legend">
@@ -131,11 +139,60 @@
     document.getElementById('statItems').textContent = ITEMS.length + '개';
   }
 
-  /* ---------- 품목 목록 · 칩 ---------- */
+  /* ---------- 품목 목록 · 칩 (여러 개 선택 가능) ---------- */
   function itemCount(no) {
     var n = 0;
     allUnits.forEach(function (u) { if (optsOf(u).indexOf(no) >= 0) n++; });
     return n;
+  }
+
+  /* 지금 선택된 품목들에 no 를 더했을 때 몇 세대가 남는지 (칩이 "선택해도 소용없음"인지 표시용) */
+  function comboCount(no) {
+    var sel = view.activeNos;
+    var n = 0;
+    allUnits.forEach(function (u) {
+      var opts = optsOf(u);
+      for (var i = 0; i < sel.length; i++) { if (sel[i] !== no && opts.indexOf(sel[i]) < 0) return; }
+      if (opts.indexOf(no) >= 0) n++;
+    });
+    return n;
+  }
+
+  function refreshChipStates() {
+    var sel = view.activeNos;
+    document.querySelectorAll('.option-chip').forEach(function (c) {
+      var no = Number(c.dataset.no);
+      var on = sel.indexOf(no) >= 0;
+      c.setAttribute('aria-pressed', on ? 'true' : 'false');
+      c.classList.toggle('is-empty', !on && sel.length > 0 && comboCount(no) === 0);
+    });
+  }
+
+  function itemName(no) {
+    var it = ITEMS.filter(function (x) { return x.no === no; })[0];
+    return it ? it.name : ('품목 ' + no);
+  }
+
+  function updateOptionHead(shownHits) {
+    var sel = view.activeNos;
+    var hintEl = document.getElementById('optionActiveHint');
+    var badgeEl = document.getElementById('optSelBadge');
+    var clearBtn = document.getElementById('optClearBtn');
+    if (!sel.length) {
+      hintEl.textContent = '';
+      badgeEl.hidden = true;
+      clearBtn.hidden = true;
+      pdfBtn.disabled = true;
+      pdfBtn.title = '먼저 공사 품목을 선택해주세요';
+      return;
+    }
+    badgeEl.hidden = false;
+    badgeEl.textContent = sel.length + '개 선택';
+    clearBtn.hidden = false;
+    var label = '"' + sel.map(itemName).join('" + "') + '"';
+    hintEl.textContent = (sel.length === 1 ? (label + ' 대상 세대 ') : (label + ' 모두 시공하는 세대 ')) + shownHits + '곳';
+    pdfBtn.disabled = false;
+    pdfBtn.title = label + ' 골구도를 PDF로 출력';
   }
 
   function paintItems() {
@@ -149,24 +206,42 @@
 
     var row = document.getElementById('optionChipRow');
     row.innerHTML = ITEMS.map(function (it) {
-      return '<button type="button" class="option-chip" data-no="' + it.no + '" aria-pressed="false">' +
+      return '<button type="button" class="option-chip" data-no="' + it.no + '" aria-pressed="' +
+             (view.activeNos.indexOf(it.no) >= 0) + '">' +
              it.no + '. ' + esc(it.name) + ' <span class="cnt">' + itemCount(it.no) + '</span></button>';
     }).join('');
     row.querySelectorAll('.option-chip').forEach(function (chip) {
       chip.addEventListener('click', function () {
         var no = Number(chip.dataset.no);
-        view.activeNo = (view.activeNo === no) ? null : no;
-        row.querySelectorAll('.option-chip').forEach(function (c) {
-          c.setAttribute('aria-pressed', Number(c.dataset.no) === view.activeNo ? 'true' : 'false');
-        });
-        var it = ITEMS.filter(function (x) { return x.no === view.activeNo; })[0];
-        document.getElementById('optionActiveHint').textContent =
-          it ? ('"' + it.name + '" 대상 세대(' + itemCount(it.no) + ') 강조 중 · 다시 누르면 해제') : '';
-        pdfBtn.disabled = !view.activeNo;
+        var i = view.activeNos.indexOf(no);
+        if (i >= 0) view.activeNos.splice(i, 1); else view.activeNos.push(no);
+        refreshChipStates();
         applyView();
       });
     });
+    refreshChipStates();
   }
+
+  document.getElementById('optClearBtn').addEventListener('click', function () {
+    view.activeNos = [];
+    refreshChipStates();
+    applyView();
+  });
+
+  /* ---------- 옵션 패널 접기/펼치기 ---------- */
+  (function () {
+    var panel = document.getElementById('optionPanel');
+    var toggle = document.getElementById('optToggle');
+    function setOpen(open) {
+      panel.classList.toggle('collapsed', !open);
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      try { localStorage.setItem('wyc_electric_optpanel', open ? '1' : '0'); } catch (e) {}
+    }
+    toggle.addEventListener('click', function () { setOpen(panel.classList.contains('collapsed')); });
+    var saved = null;
+    try { saved = localStorage.getItem('wyc_electric_optpanel'); } catch (e) {}
+    setOpen(saved !== '0');
+  })();
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
@@ -236,10 +311,12 @@
   }
 
   /* ---------- 보기 상태 ---------- */
-  var view = { query: '', filter: 'all', activeNo: null };
+  var view = { query: '', filter: 'all', activeNos: [] };
   var pdfBtn = document.getElementById('pdfBtn');
 
   function applyView() {
+    var sel = view.activeNos;
+    var shownHits = 0;
     document.querySelectorAll('.unit-cell:not(.empty)').forEach(function (c) {
       var u = UNITS[c.dataset.key];
       if (!u) return;
@@ -251,11 +328,16 @@
       if (!pass) { c.classList.remove('dim', 'opt-hit'); return; }
 
       var hit = false, dim = false;
-      if (view.activeNo) { hit = o.indexOf(view.activeNo) >= 0; dim = !hit; }
+      if (sel.length) {
+        hit = sel.every(function (no) { return o.indexOf(no) >= 0; });
+        dim = !hit;
+        if (hit) shownHits++;
+      }
       if (!dim && view.query) dim = c.dataset.label.indexOf(view.query) < 0;
       c.classList.toggle('opt-hit', hit);
       c.classList.toggle('dim', dim);
     });
+    updateOptionHead(shownHits);
   }
 
   document.getElementById('searchBox').addEventListener('input', function (e) {
@@ -355,8 +437,9 @@
 
   /* ---------- PDF ---------- */
   function buildPrintHead() {
-    if (!view.activeNo) return;
-    var it = ITEMS.filter(function (x) { return x.no === view.activeNo; })[0];
+    var sel = view.activeNos;
+    if (!sel.length) return;
+    var label = sel.map(function (no) { return no + '. ' + itemName(no); }).join(' + ');
     var byDong = {}, hit = 0;
     document.querySelectorAll('.unit-cell.opt-hit').forEach(function (c) {
       if (c.style.display === 'none') return;
@@ -367,11 +450,15 @@
     });
     var t = new Date();
     var stamp = t.getFullYear() + '.' + String(t.getMonth() + 1).padStart(2, '0') + '.' + String(t.getDate()).padStart(2, '0');
+    var descs = sel.map(function (no) {
+      var it = ITEMS.filter(function (x) { return x.no === no; })[0];
+      return (it && it.desc.length) ? it.desc.join(' / ') : null;
+    }).filter(function (s) { return !!s; }).join(' · ');
 
     document.getElementById('printTitle').textContent =
-      '청량리역 요진 와이시티 — 전기공사 ' + it.no + '. ' + it.name + ' 대상 세대';
+      '청량리역 요진 와이시티 — 전기공사 ' + label + ' 대상 세대';
     document.getElementById('printMeta').textContent =
-      '총 ' + hit + '세대 · ' + (it.desc.join(' / ') || '-') + ' · 출력일 ' + stamp;
+      '총 ' + hit + '세대' + (descs ? ' · ' + descs : '') + ' · 출력일 ' + stamp;
 
     var listHtml = '';
     ['101', '102'].forEach(function (dong) {
@@ -383,12 +470,12 @@
     });
     if (!listHtml) listHtml = '<div>해당하는 세대가 없습니다.</div>';
     listHtml += '<div class="print-legend" style="margin-top:6px;">' +
-      '<span class="box" style="background:#ffe9b0; border:1.6pt solid #000;"></span>' + it.name + ' 대상' +
+      '<span class="box" style="background:#ffe9b0; border:1.6pt solid #000;"></span>' + label + ' 대상(전부)' +
       '<span class="box" style="background:#fff; border:1px solid #ddd;"></span>해당 없음</div>';
     document.getElementById('printList').innerHTML = listHtml;
   }
   pdfBtn.addEventListener('click', function () {
-    if (!view.activeNo) return;
+    if (!view.activeNos.length) return;
     buildPrintHead();
     requestAnimationFrame(function () { setTimeout(function () { window.print(); }, 0); });
   });
