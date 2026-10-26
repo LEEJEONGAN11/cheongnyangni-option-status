@@ -11,5 +11,5 @@ window.WYC_CONFIG = {
   apiUrl: 'https://script.google.com/macros/s/AKfycbwER6M7cLCS2CDBrxkMpuhYEvnScpt5OSIDJfjkbXy28e7eGTsQzhmTPq2dSjfunNEp/exec',
 
   electricPlanDir: 'images/전기/',   // 전기 도면 폴더
-  electricPlanMax: 8                 // 한 세대에서 찾아볼 도면 장수
+  electricPlanMax: 12                // 한 세대에서 찾아볼 도면 장수 (지금 가장 많은 타입이 10장)
 };

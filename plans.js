@@ -7,11 +7,31 @@
 
   var CFG = window.WYC_CONFIG || {};
   var EDIR = CFG.electricPlanDir || 'images/전기/';
-  var EMAX = CFG.electricPlanMax || 8;
-  var EXTS = ['jpg', 'jpeg', 'png', 'webp'];
+  var EMAX = CFG.electricPlanMax || 12;
+  var EXTS = ['png', 'jpg', 'jpeg', 'webp'];
   var VARIANTS = ['기본형', '확장형'];
 
   var cache = {};       // 경로후보키 -> src | null
+
+  function imgExists(src) {
+    return new Promise(function (resolve) {
+      var img = new Image();
+      img.onload = function () { resolve(true); };
+      img.onerror = function () { resolve(false); };
+      img.src = src;
+    });
+  }
+
+  /** 파일이 있는지만 확인합니다.
+      큰 도면(PNG 수백 KB~1MB)을 "있나 없나" 보려고 통째로 내려받지 않도록 가능하면 HEAD 로 물어봅니다. */
+  function exists(src) {
+    if (typeof fetch !== 'function') return imgExists(src);
+    return fetch(src, { method: 'HEAD' }).then(function (r) {
+      if (r.ok) return true;
+      if (r.status === 404 || r.status === 410) return false;
+      return imgExists(src);            // HEAD 를 막아 둔 서버면 예전 방식으로
+    }, function () { return imgExists(src); });
+  }
 
   /** 후보 경로들을 앞에서부터 시도해서 처음 열리는 것을 돌려줍니다. */
   function probe(bases) {
@@ -26,10 +46,9 @@
       (function next() {
         if (i >= cands.length) { cache[key] = null; resolve(null); return; }
         var src = cands[i++];
-        var img = new Image();
-        img.onload = function () { cache[key] = src; resolve(src); };
-        img.onerror = next;
-        img.src = src;
+        exists(src).then(function (ok) {
+          if (ok) { cache[key] = src; resolve(src); } else next();
+        });
       })();
     });
   }
@@ -63,19 +82,42 @@
         jobs.push(probe(bases).then(function (src) { return src ? { n: n, src: src } : null; }));
       })(i);
     }
+    var namesP = loadNames();           // 기본 도면 이름도 같이 준비해 둡니다
     return Promise.all(jobs).then(function (arr) {
-      return arr.filter(Boolean);
+      return namesP.then(function () { return arr.filter(Boolean); });
     });
   }
 
-  /** 도면 이름(탭 이름). 시트에 저장해 둔 게 있으면 그걸 씁니다. */
+  /* ---- 도면 이름(탭 이름) ----
+     ① 사이트에서 직접 바꿔 저장한 이름(시트)  →  ② images/전기/names.json 의 기본 이름  →  ③ "도면 3" */
+  var namesManifest = null, namesReady = null;
+
+  function loadNames() {
+    if (namesReady) return namesReady;
+    namesReady = (typeof fetch === 'function')
+      ? fetch(EDIR + 'names.json', { cache: 'no-cache' })
+          .then(function (r) { return r.ok ? r.json() : {}; })
+          .catch(function () { return {}; })
+      : Promise.resolve({});
+    namesReady = namesReady.then(function (j) { namesManifest = j || {}; return namesManifest; });
+    return namesReady;
+  }
+
+  /** names.json 에 적어 둔 이 타입의 기본 탭 이름 (loadNames 가 끝난 뒤에 쓰세요) */
+  function defaultNames(u) {
+    var m = namesManifest || {};
+    return m[u.etype || u.type] || m[u.type || ''] || [];
+  }
+
+  /** 사이트에서 직접 저장해 둔 도면 이름. 없으면 빈 배열. */
   function planNames(store, u) {
     var v = store ? store.get('도면', u.etype || u.type) : null;
     return (v && v.names) ? v.names : [];
   }
 
-  function nameOf(names, n) {
-    return (names[n - 1] && String(names[n - 1]).trim()) || ('도면 ' + n);
+  function nameOf(names, n, defs) {
+    return (names && names[n - 1] && String(names[n - 1]).trim()) ||
+           (defs && defs[n - 1]) || ('도면 ' + n);
   }
 
   /* ---------- 화면 그리기 ---------- */
@@ -90,6 +132,7 @@
       if (!list.length) return renderFallback(host, u);
 
       var names = planNames(store, u);
+      var defs = defaultNames(u);
       var idx = 0;
 
       function draw() {
@@ -97,11 +140,11 @@
         var html = '<div class="plan-box"><div class="eplan-tabs">';
         list.forEach(function (p, i) {
           html += '<button type="button" class="eplan-tab" data-i="' + i + '" aria-pressed="' +
-                  (i === idx) + '">' + esc(nameOf(names, p.n)) + '</button>';
+                  (i === idx) + '">' + esc(nameOf(names, p.n, defs)) + '</button>';
         });
         html += '</div>';
         html += '<div class="plan-frame"><img class="plan-img" data-zoom="1" src="' + esc(cur.src) +
-                '" alt="' + esc(u.label + ' 전기도면 ' + nameOf(names, cur.n)) + '"></div>';
+                '" alt="' + esc(u.label + ' 전기도면 ' + nameOf(names, cur.n, defs)) + '"></div>';
         html += '<div class="eplan-nav">' +
                 '<button type="button" class="wbtn ghost" data-step="-1"' + (idx === 0 ? ' disabled' : '') + '>‹ 이전</button>' +
                 '<span class="pos">' + (idx + 1) + ' / ' + list.length + '</span>' +
@@ -134,7 +177,7 @@
     function draw() {
       var html = '<div class="plan-box">' +
         '<p class="empty-note" style="margin-bottom:10px;">이 세대의 전기 도면이 아직 없습니다. ' +
-        '저장소 <b>' + esc(EDIR) + '</b> 폴더에 <b>' + esc((u.etype || u.type) + '_1.jpg') +
+        '저장소 <b>' + esc(EDIR) + '</b> 폴더에 <b>' + esc((u.etype || u.type) + '_1.png') +
         '</b> 처럼 올리면 바로 나타납니다.<br>우선 세대 평면도를 보여드릴게요.</p>' +
         '<div class="plan-variant-row">' +
         VARIANTS.map(function (v) {
@@ -202,20 +245,194 @@
     draw();
   }
 
+  /* ---------- 크게 보기: 확대·축소 · 끌어서 이동 ----------
+     마우스 휠 / 두 손가락 벌리기 / ＋－ 버튼 / 두 번 누르기 로 확대하고,
+     확대한 상태에서는 끌어서 움직입니다. (A3 도면을 200DPI 로 올려 두었기 때문에
+     확대하면 작은 글씨와 치수까지 또렷하게 읽힙니다.) */
+  var LB = { nw: 0, nh: 0, s: 1, s0: 1, max: 2.5, x: 0, y: 0, moved: false, ptrs: {}, down: null, tapAt: 0, tapX: 0, tapY: 0, tk: 0 };
+
+  function lbBox() { return document.getElementById('lightbox'); }
+  function lbImg() { return document.getElementById('lightboxImg'); }
+
+  /** 화면에 꼭 맞는 배율 (원본보다 크게 늘리지는 않습니다) */
+  function lbCalcFit() {
+    var b = lbBox();
+    var W = Math.max(b.clientWidth, 1), H = Math.max(b.clientHeight, 1);   // 창이 아직 안 그려졌을 때(0) 대비
+    LB.s0 = Math.max(0.02, Math.min((W - 24) / LB.nw, (H - 84) / LB.nh, 1));
+    LB.max = Math.max(2.5, LB.s0 * 4);
+  }
+
+  /** 그림이 화면 밖으로 너무 나가지 않게, 작을 땐 가운데로 */
+  function lbClamp() {
+    var b = lbBox(), w = LB.nw * LB.s, h = LB.nh * LB.s;
+    LB.x = (w <= b.clientWidth)  ? (b.clientWidth  - w) / 2 : Math.min(0, Math.max(b.clientWidth  - w, LB.x));
+    LB.y = (h <= b.clientHeight) ? (b.clientHeight - h) / 2 : Math.min(0, Math.max(b.clientHeight - h, LB.y));
+  }
+
+  function lbApply() {
+    lbImg().style.transform = 'translate(' + LB.x + 'px,' + LB.y + 'px) scale(' + LB.s + ')';
+    var z = document.getElementById('lbZoomPct');
+    if (z) z.textContent = Math.round(LB.s * 100) + '%';
+  }
+
+  function lbFit() {
+    lbCalcFit();
+    LB.s = LB.s0; LB.x = 0; LB.y = 0;
+    lbClamp(); lbApply();
+  }
+
+  /** (px,py) 지점이 그대로 있도록 ns 배율로 */
+  function lbZoomTo(ns, px, py) {
+    ns = Math.min(LB.max, Math.max(LB.s0, ns));
+    var r = ns / LB.s;
+    LB.x = px - (px - LB.x) * r;
+    LB.y = py - (py - LB.y) * r;
+    LB.s = ns;
+    lbClamp(); lbApply();
+  }
+
+  /** 처음 열 때 몇 초만 보여주는 사용법 안내 (폰/PC 에 맞춰 문구가 다름) */
+  function lbShowHint() {
+    var h = document.getElementById('lbHint');
+    if (!h) return;
+    var touch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    h.textContent = touch ? '두 손가락으로 벌려 확대 · 두 번 누르면 확대/맞춤'
+                          : '휠로 확대 · 끌어서 이동 · 두 번 클릭하면 확대/맞춤';
+    h.classList.add('show');
+    clearTimeout(h._t);
+    h._t = setTimeout(function () { h.classList.remove('show'); }, 3600);
+  }
+
   function zoom(src) {
-    var lb = document.getElementById('lightbox');
-    var img = document.getElementById('lightboxImg');
+    var lb = lbBox(), img = lbImg();
     if (!lb || !img) return;
-    img.src = src;
-    lb.classList.add('open');
+    var tk = ++LB.tk;
+    LB.ptrs = {}; LB.moved = false;
+    lb.classList.add('open', 'zoomable', 'loading');
+    lbShowHint();
+    img.style.visibility = 'hidden';
+    var pre = new Image();
+    function done() {
+      if (tk !== LB.tk) return;                       // 그 사이 다른 그림을 열었으면 무시
+      LB.nw = pre.naturalWidth || 1200;
+      LB.nh = pre.naturalHeight || 800;
+      img.style.width = LB.nw + 'px';
+      img.style.height = LB.nh + 'px';
+      img.src = src;
+      img.style.visibility = '';
+      lb.classList.remove('loading');
+      lbFit();
+    }
+    pre.onload = done;
+    pre.onerror = done;
+    pre.src = src;
   }
 
   function initLightbox() {
-    var lb = document.getElementById('lightbox');
+    var lb = lbBox();
     if (!lb) return;
+
+    var tools = document.createElement('div');
+    tools.className = 'lb-tools';
+    tools.innerHTML =
+      '<button type="button" data-z="out" aria-label="축소">−</button>' +
+      '<span id="lbZoomPct">100%</span>' +
+      '<button type="button" data-z="in" aria-label="확대">＋</button>' +
+      '<button type="button" data-z="fit" class="wide">맞춤</button>' +
+      '<button type="button" data-z="one" class="wide">원본 크기</button>';
+    lb.appendChild(tools);
+    var hint = document.createElement('div');
+    hint.id = 'lbHint';
+    hint.className = 'lb-hint';
+    lb.appendChild(hint);
+    tools.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('button[data-z]') : null;
+      if (!b) return;
+      e.stopPropagation();
+      var cx = lb.clientWidth / 2, cy = lb.clientHeight / 2, z = b.getAttribute('data-z');
+      if (z === 'in') lbZoomTo(LB.s * 1.4, cx, cy);
+      else if (z === 'out') lbZoomTo(LB.s / 1.4, cx, cy);
+      else if (z === 'fit') lbFit();
+      else if (z === 'one') lbZoomTo(1, cx, cy);
+    });
+
     var close = document.getElementById('lightboxClose');
     if (close) close.addEventListener('click', function () { lb.classList.remove('open'); });
-    lb.addEventListener('click', function (e) { if (e.target === lb) lb.classList.remove('open'); });
+
+    // 빈 곳을 누르면 닫힘. (끌어서 옮기다 손을 뗀 경우는 닫지 않습니다)
+    lb.addEventListener('click', function (e) {
+      if (LB.moved) { LB.moved = false; return; }
+      if (e.target === lb) lb.classList.remove('open');
+    });
+
+    lb.addEventListener('wheel', function (e) {
+      if (!lb.classList.contains('zoomable') || !LB.nw) return;
+      e.preventDefault();
+      var dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+      lbZoomTo(LB.s * Math.exp(-dy * (e.ctrlKey ? 0.012 : 0.0016)), e.clientX, e.clientY);
+    }, { passive: false });
+
+    lb.addEventListener('pointerdown', function (e) {
+      if (!lb.classList.contains('zoomable') || !LB.nw) return;
+      if (e.target.closest && e.target.closest('.lb-tools, .lightbox-close')) return;
+      LB.ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
+      if (Object.keys(LB.ptrs).length === 1) {
+        LB.moved = false;
+        LB.down = { x: e.clientX, y: e.clientY };
+      }
+      lb.classList.add('grabbing');
+    });
+
+    window.addEventListener('pointermove', function (e) {
+      var p = LB.ptrs[e.pointerId];
+      if (!p) return;
+      var ids = Object.keys(LB.ptrs);
+      if (ids.length === 1) {
+        LB.x += e.clientX - p.x;
+        LB.y += e.clientY - p.y;
+        if (Math.abs(e.clientX - LB.down.x) + Math.abs(e.clientY - LB.down.y) > 6) LB.moved = true;
+        p.x = e.clientX; p.y = e.clientY;
+        lbClamp(); lbApply();
+      } else {
+        // 두 손가락: 벌린 비율만큼 확대, 두 손가락 가운데 점이 움직인 만큼 이동
+        var q = LB.ptrs[ids[0] === String(e.pointerId) ? ids[1] : ids[0]];
+        var d0 = Math.hypot(p.x - q.x, p.y - q.y), cx0 = (p.x + q.x) / 2, cy0 = (p.y + q.y) / 2;
+        p.x = e.clientX; p.y = e.clientY;
+        var d1 = Math.hypot(p.x - q.x, p.y - q.y), cx1 = (p.x + q.x) / 2, cy1 = (p.y + q.y) / 2;
+        LB.moved = true;
+        LB.x += cx1 - cx0; LB.y += cy1 - cy0;
+        if (d0 > 0) lbZoomTo(LB.s * d1 / d0, cx1, cy1);
+        else { lbClamp(); lbApply(); }
+      }
+    });
+
+    function endPointer(e) {
+      if (!LB.ptrs[e.pointerId]) return;
+      var wasSingle = Object.keys(LB.ptrs).length === 1;
+      delete LB.ptrs[e.pointerId];
+      if (!Object.keys(LB.ptrs).length) lb.classList.remove('grabbing');
+      // 그림을 두 번 누르면(두 번 클릭) 확대 ↔ 맞춤
+      if (wasSingle && e.type === 'pointerup' && !LB.moved && e.target !== lb) {
+        var now = Date.now();
+        if (now - LB.tapAt < 320 && Math.abs(e.clientX - LB.tapX) + Math.abs(e.clientY - LB.tapY) < 40) {
+          LB.tapAt = 0;
+          if (LB.s > LB.s0 * 1.05) lbFit();
+          else lbZoomTo(Math.min(LB.max, Math.max(LB.s0 * 3, 1)), e.clientX, e.clientY);
+        } else {
+          LB.tapAt = now; LB.tapX = e.clientX; LB.tapY = e.clientY;
+        }
+      }
+    }
+    window.addEventListener('pointerup', endPointer);
+    window.addEventListener('pointercancel', endPointer);
+
+    window.addEventListener('resize', function () {
+      if (!lb.classList.contains('open') || !LB.nw) return;
+      var atFit = LB.s <= LB.s0 * 1.001;
+      lbCalcFit();
+      LB.s = atFit ? LB.s0 : Math.min(LB.max, Math.max(LB.s0, LB.s));
+      lbClamp(); lbApply();
+    });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initLightbox);
   else initLightbox();
@@ -226,6 +443,7 @@
     renderElectric: renderElectric,
     renderUnitPlan: renderUnitPlan,
     planNames: planNames,
+    defaultNames: defaultNames,
     nameOf: nameOf,
     zoom: zoom,
     EDIR: EDIR,

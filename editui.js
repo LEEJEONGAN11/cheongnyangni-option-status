@@ -331,10 +331,13 @@
         return;
       }
       var names = P.planNames(S, u).slice();
+      var defs = P.defaultNames(u);
       slot.innerHTML = '<div class="pin-wrap" style="max-width:none;">' +
         list.map(function (p) {
-          return '<label>' + esc(p.src.split('/').pop()) + '</label>' +
-                 '<input type="text" class="name" data-n="' + p.n + '" placeholder="' + esc(P.nameOf(names, p.n)) +
+          var fname = p.src.split('/').pop();
+          try { fname = decodeURIComponent(fname); } catch (e) {}
+          return '<label>' + esc(fname) + '</label>' +
+                 '<input type="text" class="name" data-n="' + p.n + '" placeholder="' + esc(P.nameOf([], p.n, defs)) +
                  '" value="' + esc(names[p.n - 1] || '') + '">';
         }).join('') +
         '<div class="btn-row"><button type="button" class="wbtn" id="pnSave">도면 이름 저장</button></div></div>';
