@@ -11,7 +11,8 @@
   var EXTS = ['png', 'jpg', 'jpeg', 'webp'];
   var VARIANTS = ['기본형', '확장형'];
 
-  var cache = {};       // 경로후보키 -> src | null
+  var cache = {};         // 경로후보키 -> src | null   (확정된 결과만 저장)
+  var existsCache = {};   // 파일 주소 하나 -> true | false (확정된 결과만 저장)
 
   function imgExists(src) {
     return new Promise(function (resolve) {
@@ -22,15 +23,28 @@
     });
   }
 
-  /** 파일이 있는지만 확인합니다.
-      큰 도면(PNG 수백 KB~1MB)을 "있나 없나" 보려고 통째로 내려받지 않도록 가능하면 HEAD 로 물어봅니다. */
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  /** 파일이 있는지만 확인합니다.  → true(있음) / false(없음) / null(지금은 모름)
+      · 큰 도면(PNG 수백 KB~1MB)을 "있나 없나" 보려고 통째로 내려받지 않도록 HEAD 로 물어봅니다.
+      · 같은 주소는 한 번만 물어봅니다.
+      · 서버가 잠깐 바빠서(429/5xx) 답을 못 주면 한 번 더 물어보고, 그래도 모르면 null.
+        이때는 "없다"고 단정하지 않고(=도면 없음으로 잘못 보이지 않게) 결과도 저장하지 않습니다. */
   function exists(src) {
-    if (typeof fetch !== 'function') return imgExists(src);
-    return fetch(src, { method: 'HEAD' }).then(function (r) {
-      if (r.ok) return true;
-      if (r.status === 404 || r.status === 410) return false;
-      return imgExists(src);            // HEAD 를 막아 둔 서버면 예전 방식으로
-    }, function () { return imgExists(src); });
+    if (Object.prototype.hasOwnProperty.call(existsCache, src)) return Promise.resolve(existsCache[src]);
+    function done(v) { if (v === true || v === false) existsCache[src] = v; return v; }
+    if (typeof fetch !== 'function') return imgExists(src).then(done);
+    function ask(canRetry) {
+      return fetch(src, { method: 'HEAD' }).then(function (r) {
+        if (r.ok) return true;
+        if (r.status === 404 || r.status === 410) return false;
+        if (r.status === 429 || r.status >= 500) {
+          return canRetry ? wait(900).then(function () { return ask(false); }) : null;
+        }
+        return imgExists(src);          // 405 등, HEAD 를 막아 둔 서버면 예전 방식으로
+      }, function () { return imgExists(src); });
+    }
+    return ask(true).then(done);
   }
 
   /** 후보 경로들을 앞에서부터 시도해서 처음 열리는 것을 돌려줍니다. */
@@ -42,12 +56,13 @@
       EXTS.forEach(function (e) { cands.push(b + '.' + e); });
     });
     return new Promise(function (resolve) {
-      var i = 0;
+      var i = 0, unsure = false;
       (function next() {
-        if (i >= cands.length) { cache[key] = null; resolve(null); return; }
+        if (i >= cands.length) { if (!unsure) cache[key] = null; resolve(null); return; }
         var src = cands[i++];
         exists(src).then(function (ok) {
-          if (ok) { cache[key] = src; resolve(src); } else next();
+          if (ok === true) { cache[key] = src; resolve(src); }
+          else { if (ok === null) unsure = true; next(); }
         });
       })();
     });
@@ -71,19 +86,30 @@
 
   /** 한 세대의 전기 도면을 전부 찾습니다. → [{n, src}] */
   function findElectric(u) {
-    var jobs = [];
-    for (var i = 1; i <= EMAX; i++) {
-      (function (n) {
-        var bases = [
-          EDIR + enc(u.dong + '_' + u.ho + '_' + n),   // 세대 전용 (102_1902_1.jpg)
-          EDIR + enc((u.etype || u.type) + '_' + n),   // 타입별   (59B_1.jpg)
-          EDIR + enc((u.type || '') + '_' + n)         // 우/좌 구분 없는 타입 (59A_1.jpg)
-        ];
-        jobs.push(probe(bases).then(function (src) { return src ? { n: n, src: src } : null; }));
-      })(i);
-    }
     var namesP = loadNames();           // 기본 도면 이름도 같이 준비해 둡니다
-    return Promise.all(jobs).then(function (arr) {
+
+    // 타입별 파일 이름 앞부분 (59A우 → "59A우", "59A" 순서로, 같으면 하나만)
+    var typeKeys = [];
+    [u.etype || u.type, u.type || ''].forEach(function (t) {
+      if (t && typeKeys.indexOf(t) < 0) typeKeys.push(t);
+    });
+    var unitKey = u.dong + '_' + u.ho + '_';            // 세대 전용 (102_1902_1.png)
+
+    // 세대 전용 파일은 "1번"이 있을 때만 번호별로 찾습니다.
+    // (거의 모든 세대는 전용 파일이 없는데, 번호마다 다 물어보면 요청이 수십 건으로 늘기 때문입니다.
+    //  타입별 파일의 확인 결과는 같은 타입 세대끼리 공유되어 두 번째부터는 다시 묻지 않습니다.)
+    return probe([EDIR + enc(unitKey + '1')]).then(function (unitFirst) {
+      var jobs = [];
+      for (var i = 1; i <= EMAX; i++) {
+        (function (n) {
+          var bases = [];
+          if (unitFirst) bases.push(EDIR + enc(unitKey + n));
+          typeKeys.forEach(function (t) { bases.push(EDIR + enc(t + '_' + n)); });
+          jobs.push(probe(bases).then(function (src) { return src ? { n: n, src: src } : null; }));
+        })(i);
+      }
+      return Promise.all(jobs);
+    }).then(function (arr) {
       return namesP.then(function () { return arr.filter(Boolean); });
     });
   }
